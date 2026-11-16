@@ -216,7 +216,6 @@
           <a href="#material"><b>Bibliografía</b><span>Lo que usamos en cada módulo.</span></a>
           ${url(a.classroom) ? `<a ${ext} href="${url(a.classroom)}"><b>Material extra</b><span>Tareas y práctica, en Classroom.</span></a>` : ''}
           <a href="#progreso"><b>Tu progreso</b><span>Las devoluciones de tu profe.</span></a>
-          ${datos.libro.titulo ? `<a href="#material"><b>Literatura</b><span>${esc(datos.libro.titulo)}</span></a>` : ''}
         </div>
       </section>
       ${pieContacto()}`;
@@ -232,7 +231,7 @@
   }
 
   function vMaterial() {
-    const a = datos.alumno, p = datos.programa, l = datos.libro;
+    const a = datos.alumno, p = datos.programa;
     const modulos = p.length ? p.map(m => {
       const abierto = m.estado === 'en curso' || (!a.moduloActual && m === p[0]);
       const etiqueta = m.estado === 'completado' ? `<span class="p-estado">${ICONOS.ok}Completado</span>`
@@ -260,13 +259,6 @@
               <span class="p-muted">${m.examenFecha ? esc(m.examenFecha) : ''}${url(m.examenLink) ? ` · <a ${ext} href="${url(m.examenLink)}">ver en Classroom</a>` : ''}</span></li>`).join('')}</ul>`
               : '<p class="p-muted">No hay exámenes programados por ahora.</p>'}
           </section>
-          ${l.titulo ? `<section class="p-card p-crema" aria-labelledby="lit-t">
-            <p class="p-eyebrow">Literatura · estás leyendo</p>
-            <h2 id="lit-t" class="p-h3" lang="en">${esc(l.titulo)}</h2>
-            ${l.autor ? `<p class="p-muted">${esc(l.autor)}</p>` : ''}
-            ${l.consigna ? `<p>${esc(l.consigna)}</p>` : ''}
-            ${url(l.link) ? `<a class="btn btn-primario p-full" ${ext} href="${url(l.link)}">Abrir el libro</a>` : ''}
-          </section>` : ''}
         </div>
       </div>`;
   }

@@ -18,7 +18,7 @@ function planilla() { return SpreadsheetApp.openById(PLANILLA_ID); }
 
 const HOJAS = {
   alumnos: ['Mail de Google', 'Nombre', 'Curso', 'Nivel', 'Módulo actual', 'Día', 'Hora inicio', 'Hora fin',
-            'Link de Meet', 'Link de Classroom', 'Libro', 'Autor', 'Consigna de lectura', 'Link del libro', 'Activo'],
+            'Link de Meet', 'Link de Classroom', 'Activo'],
   cuotas: ['Mail de Google', 'Mes', 'Monto', 'Vence', 'Estado', 'Fecha de pago', 'Medio'],
   programas: ['Curso', 'Nivel', 'Módulo N°', 'Módulo', 'Temas', 'Bibliografía', 'Link de tareas',
               'Link de práctica', 'Fecha de examen', 'Link del examen'],
@@ -192,10 +192,6 @@ function datosDelAlumno(a, usuario) {
       dia: texto(a['Día']), horaInicio: hora(a['Hora inicio']), horaFin: hora(a['Hora fin']),
       meet: texto(a['Link de Meet']), classroom: texto(a['Link de Classroom'])
     },
-    libro: {
-      titulo: texto(a['Libro']), autor: texto(a['Autor']),
-      consigna: texto(a['Consigna de lectura']), link: texto(a['Link del libro'])
-    },
     programa: programa,
     cuotas: cuotas,
     devoluciones: devoluciones,
@@ -248,7 +244,7 @@ function configurar() {
   if (cfg.getLastRow() < 2) cfg.getRange(2, 1, CONFIG_INICIAL.length, 2).setValues(CONFIG_INICIAL);
 
   const sino = SpreadsheetApp.newDataValidation().requireValueInList(['Sí', 'No'], true).build();
-  hoja('alumnos').getRange('O2:O').setDataValidation(sino);
+  hoja('alumnos').getRange('K2:K').setDataValidation(sino);
   const dias = SpreadsheetApp.newDataValidation()
     .requireValueInList(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'], true).build();
   hoja('alumnos').getRange('F2:F').setDataValidation(dias);
@@ -262,7 +258,7 @@ function configurar() {
 
 function crearFormularioDevoluciones() {
   const ss = planilla();
-  const form = FormApp.create('Devolución de fin de módulo · PTH');
+  const form = FormApp.create('Devolución para el alumno · PTH');
   form.setDescription('Para las docentes de Professional Training Hub. Lo que completes aparece en «Tu progreso» ' +
                       'del portal de ese alumno.');
   form.addListItem().setTitle('Docente').setRequired(true);
@@ -328,4 +324,16 @@ function pedirNombreDocente() {
     form.moveItem(item.getIndex(), 0);
   }
   actualizarFormulario();
+}
+
+// Se corrió una vez (16/11/2026): cambia el nombre del formulario y saca las columnas del libro.
+function quitarLibroYRenombrar() {
+  const form = FormApp.openById(PropertiesService.getScriptProperties().getProperty('FORM_ID'));
+  form.setTitle('Devolución para el alumno · PTH');
+  const h = hoja('alumnos');
+  const enc = h.getRange(1, 1, 1, h.getLastColumn()).getValues()[0];
+  ['Link del libro', 'Consigna de lectura', 'Autor', 'Libro'].forEach(t => {
+    const i = enc.indexOf(t);
+    if (i >= 0) h.deleteColumn(i + 1);
+  });
 }

@@ -14,13 +14,14 @@ No hay contraseñas ni claves secretas en este repositorio: el ID de cliente y l
 
 | Pestaña | Qué se carga |
 |---|---|
-| Alumnos | Una fila por alumno: mail de Google, curso, nivel, módulo actual, día y horario, links de Meet y Classroom, libro. «Activo: No» le quita el acceso. |
+| Alumnos | Una fila por alumno: mail de Google, curso, nivel, módulo actual, día y horario, links de Meet y Classroom. «Activo: No» le quita el acceso. |
 | Cuotas | Una fila por cuota: mail, mes, monto, vencimiento, estado (Pendiente/Pagado), fecha y medio de pago. |
 | Programas | Una fila por módulo de cada curso y nivel: temas, bibliografía (una línea por material, `Texto \| link`), tareas, práctica, examen. |
-| Devoluciones | La llena el formulario de las docentes. |
+| Docentes | Un nombre por fila. Es la lista del desplegable «Docente» del formulario. |
+| Devoluciones | La llena el formulario de las docentes (Devolución para el alumno · PTH). |
 | Opiniones | La llena el portal cuando un alumno envía su opinión. |
 | Config | Alias, titular y banco para transferencias; WhatsApp de Caro y Marian; mensaje opcional para el inicio. |
 
 ## Cambios en el script
 
-Editar `portal/apps-script/Codigo.gs`, pegarlo en Extensiones › Apps Script de la planilla y publicar una **nueva versión** de la implementación existente (así no cambia la dirección).
+Editar `portal/apps-script/Codigo.gs`, pegarlo en el proyecto de Apps Script «Portal del alumno PTH» (script.google.com, cuenta de PTH) y publicar una **nueva versión** de la implementación existente (así no cambia la dirección).
