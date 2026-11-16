@@ -24,10 +24,12 @@ const HOJAS = {
               'Link de práctica', 'Fecha de examen', 'Link del examen'],
   opiniones: ['Fecha', 'Mail de Google', 'Nombre', 'Curso', 'Nota', 'Tema', 'Lo que más sirve', 'Qué cambiaría'],
   config: ['Clave', 'Valor'],
-  docentes: ['Docente']
+  docentes: ['Docente'],
+  niveles: ['Curso', 'Nivel', 'Total de módulos']
 };
 const NOMBRES = { alumnos: 'Alumnos', cuotas: 'Cuotas', programas: 'Programas', opiniones: 'Opiniones',
-                  config: 'Config', docentes: 'Docentes', devoluciones: 'Devoluciones' };
+                  config: 'Config', docentes: 'Docentes', niveles: 'Niveles',
+                  devoluciones: 'Devoluciones' };
 const CONFIG_INICIAL = [
   ['Alias', ''], ['Titular de la cuenta', ''], ['Banco', ''],
   ['WhatsApp Caro', '5491134953141'], ['WhatsApp Marian', '5491153350085'],
@@ -161,6 +163,11 @@ function datosDelAlumno(a, usuario) {
     })
     .sort((x, y) => x.n - y.n);
 
+  // Avance: módulos completados sobre el total del nivel (pestaña Niveles; si no está, los módulos cargados).
+  const nivelCfg = filas('niveles').find(n => texto(n['Curso']) === curso && texto(n['Nivel']) === nivel);
+  const total = Math.max(Number(nivelCfg && nivelCfg['Total de módulos']) || 0, programa.length);
+  const avance = { completados: actual ? Math.max(0, Math.min(actual - 1, total)) : 0, total: total };
+
   const email = usuario.email;
   const cuotas = filas('cuotas')
     .filter(c => texto(c['Mail de Google']).toLowerCase() === email)
@@ -193,6 +200,7 @@ function datosDelAlumno(a, usuario) {
       meet: texto(a['Link de Meet']), classroom: texto(a['Link de Classroom'])
     },
     programa: programa,
+    avance: avance,
     cuotas: cuotas,
     devoluciones: devoluciones,
     config: {
@@ -336,4 +344,21 @@ function quitarLibroYRenombrar() {
     const i = enc.indexOf(t);
     if (i >= 0) h.deleteColumn(i + 1);
   });
+}
+
+// Se corrió una vez (16/11/2026): crea la pestaña Niveles con cada curso y nivel que ya figura en la planilla.
+function crearPestanaNiveles() {
+  const ss = planilla();
+  if (ss.getSheetByName(NOMBRES.niveles)) return;
+  const h = ss.insertSheet(NOMBRES.niveles);
+  h.getRange(1, 1, 1, 3).setValues([HOJAS.niveles])
+    .setFontWeight('bold').setBackground('#1d231f').setFontColor('#ffffff');
+  h.setFrozenRows(1);
+  const pares = {};
+  filas('alumnos').concat(filas('programas')).forEach(f => {
+    const c = texto(f['Curso']), n = texto(f['Nivel']);
+    if (c) pares[c + '|' + n] = [c, n, ''];
+  });
+  const valores = Object.values(pares);
+  if (valores.length) h.getRange(2, 1, valores.length, 3).setValues(valores);
 }

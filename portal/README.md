@@ -17,6 +17,7 @@ No hay contraseñas ni claves secretas en este repositorio: el ID de cliente y l
 | Alumnos | Una fila por alumno: mail de Google, curso, nivel, módulo actual, día y horario, links de Meet y Classroom. «Activo: No» le quita el acceso. |
 | Cuotas | Una fila por cuota: mail, mes, monto, vencimiento, estado (Pendiente/Pagado), fecha y medio de pago. |
 | Programas | Una fila por módulo de cada curso y nivel: temas, bibliografía (una línea por material, `Texto \| link`), tareas, práctica, examen. |
+| Niveles | Una fila por curso y nivel con el total de módulos. Es la base de la barra «Avance del nivel»; si falta, se usa la cantidad de módulos cargados en Programas. |
 | Docentes | Un nombre por fila. Es la lista del desplegable «Docente» del formulario. |
 | Devoluciones | La llena el formulario de las docentes (Devolución para el alumno · PTH). |
 | Opiniones | La llena el portal cuando un alumno envía su opinión. |

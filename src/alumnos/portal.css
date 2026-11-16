@@ -65,7 +65,7 @@
 .p-estado svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2.6; }
 
 .p-sec { display: flex; flex-direction: column; gap: 14px; }
-.p-accesos { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.p-accesos { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .p-accesos a { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; text-decoration: none; display: flex; flex-direction: column; gap: 4px; min-height: 96px; }
 .p-accesos a:hover { border-color: var(--ink); }
 .p-accesos b { font-size: 1.08rem; }
@@ -149,3 +149,16 @@
 [hidden] { display: none !important; }
 .p-negro .btn-sec { color: var(--on-negro); border-color: var(--on-negro); }
 .p-negro .btn-sec:hover { background: rgba(255,255,255,.08); }
+
+/* Avance del nivel */
+.p-avance { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 8px; font-size: 14.5px; }
+.p-avance .p-fila { flex-wrap: wrap; gap: 4px 12px; }
+.p-avance-tit { opacity: .72; }
+.p-avance-barra { display: grid; gap: 4px; }
+.p-avance-barra span { height: 10px; border-radius: 2px; background: rgba(255,255,255,.18); }
+.p-avance-barra span.on { background: var(--amarillo); }
+.p-avance-barra span.act { background: repeating-linear-gradient(-45deg, var(--amarillo) 0 4px, transparent 4px 8px); outline: 1px solid var(--amarillo); outline-offset: -1px; }
+.p-avance-claro .p-avance-barra span { background: var(--line); }
+.p-avance-claro .p-avance-barra span.on { background: var(--ink); }
+.p-avance-claro .p-avance-barra span.act { background: repeating-linear-gradient(-45deg, var(--ink) 0 4px, transparent 4px 8px); outline-color: var(--ink); }
+.p-sec-sm { margin-bottom: 20px; }
