@@ -256,6 +256,8 @@ def curso_ld(nombre, desc, ruta):
             "hasCourseInstance": {"@type": "CourseInstance", "courseMode": "online", "courseWorkload": "PT1H por semana"}}
 
 
+WEBSITE_LD = {"@context": "https://schema.org", "@type": "WebSite", "name": "Professional Training Hub",
+              "alternateName": ["PTH", "Prof Training Hub"], "url": DOMINIO + "/"}
 ORG_LD = {"@context": "https://schema.org", "@type": "EducationalOrganization", "name": "Professional Training Hub",
           "alternateName": "PTH", "url": DOMINIO + "/", "logo": DOMINIO + "/assets/img/pth-favicon-512.png",
           "description": "Academia online de inglés para adultos: clases en vivo, individuales o en grupos reducidos.",
@@ -909,9 +911,9 @@ def paginas():
     bus_desc = "Inglés para reuniones, presentaciones, entrevistas y negociaciones. Ocho módulos sobre el mundo laboral, en vivo y online. Individual o para empresas."
     wan_desc = "Wanderlust: clases de inglés en vivo para viajar con confianza. Aeropuertos, hoteles, compras y qué hacer si algo sale mal. Todos los niveles."
     return [
-        Pagina("", "Clases de inglés online para adultos | PTH",
-               "Clases de inglés en vivo: General English, Business English, Wanderlust y exámenes Cambridge. Individuales o en grupos reducidos. Consultá sin cargo.",
-               None, MSG_GENERAL, c_inicio, jsonld=[ORG_LD]),
+        Pagina("", "Professional Training Hub | Clases de inglés online en vivo",
+               "Professional Training Hub (PTH), academia online de inglés: General English, Business English, Wanderlust y exámenes Cambridge. Clases en vivo, individuales o en grupos reducidos.",
+               None, MSG_GENERAL, c_inicio, jsonld=[ORG_LD, WEBSITE_LD]),
         Pagina("cursos/", "Cursos de inglés online en vivo | PTH",
                "Programas de inglés online en vivo: inglés general, de negocios, para viajar y preparación de exámenes Cambridge. Individuales o en grupos reducidos.",
                None, MSG_GENERAL, c_cursos, migas=[("cursos/", "Cursos")], activo="cursos/"),
