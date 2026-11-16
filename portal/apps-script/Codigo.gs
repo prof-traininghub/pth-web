@@ -94,6 +94,24 @@ function texto(v) {
   return String(v).trim();
 }
 
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto',
+  'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+// Sheets convierte «Octubre 2026» en fecha: la devolvemos como texto en castellano.
+function mes(v) {
+  if (v instanceof Date) {
+    return MESES[Number(Utilities.formatDate(v, ZONA, 'M')) - 1] + ' ' + Utilities.formatDate(v, ZONA, 'yyyy');
+  }
+  const t = texto(v);
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+// 100000 → «$ 100.000». Si escribieron el monto como texto, se respeta.
+function plata(v) {
+  if (typeof v === 'number') return '$ ' + Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return texto(v);
+}
+
 function hora(v) {
   if (v instanceof Date) return Utilities.formatDate(v, ZONA, 'HH:mm');
   return String(v || '').trim();
@@ -146,7 +164,7 @@ function datosDelAlumno(a, usuario) {
   const cuotas = filas('cuotas')
     .filter(c => texto(c['Mail de Google']).toLowerCase() === email)
     .map(c => ({
-      mes: texto(c['Mes']), monto: texto(c['Monto']), vence: texto(c['Vence']),
+      mes: mes(c['Mes']), monto: plata(c['Monto']), vence: texto(c['Vence']),
       estado: texto(c['Estado']) || 'Pendiente', fechaPago: texto(c['Fecha de pago']), medio: texto(c['Medio'])
     }))
     .reverse();
