@@ -25,8 +25,7 @@ El repositorio está conectado a Netlify: cada cambio que se sube a la rama `mai
 - Formularios: detección activada; las consultas de los tres formularios (`consulta-rapida`, `contacto`, `empresas`) llegan por mail a prof.traininghub@gmail.com. Tienen reCAPTCHA de Netlify.
 - Analytics: GA4, ID `G-L41KL5314T` (cuenta de Google de PTH). Solo se incluye en `dist/`, no en la vista previa.
 
-## Después de publicar
+## Google
 
-- Dar de alta el dominio en Google Search Console y enviar `https://proftraininghub.com.ar/sitemap.xml`.
-- Crear la propiedad de Google Analytics 4 y pegar el fragmento en `build.py`, donde dice «Google Analytics 4». El script ya registra clics a WhatsApp y envíos de formularios.
-- Reemplazar los textos resaltados entre corchetes cuando PTH envíe los datos.
+- Search Console: propiedad `https://proftraininghub.com.ar/` (cuenta de Google de PTH), verificada con Google Analytics. Sitemap enviado: `sitemap.xml`. No borrar el código de Analytics: si se borra, se pierde la verificación.
+- Analytics: GA4 `G-L41KL5314T`, misma cuenta.
