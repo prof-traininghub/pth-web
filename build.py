@@ -405,12 +405,11 @@ def c_inicio(p):
     <div class="cta-amarillo">
       <h2 id="cta-t">¿Listo para dar el siguiente paso?</h2>
       <p>Dejá tu email y te ayudamos a elegir el curso ideal. Consulta sin cargo, sin inscripción.</p>
-      <form class="form-rapido" name="consulta-rapida" method="POST" action="{rel(p, "gracias/")}" data-netlify="true" data-netlify-recaptcha="true" netlify-honeypot="bot-field">
+      <form class="form-rapido" name="consulta-rapida" method="POST" action="{rel(p, "gracias/")}" data-netlify="true" netlify-honeypot="bot-field">
         <input type="hidden" name="form-name" value="consulta-rapida">
         <p class="oculto"><label>No completar: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
         <label class="oculto" for="r-email">Tu email</label>
         <input id="r-email" name="email" type="email" required autocomplete="email" placeholder="Tu email">
-        <div class="captcha" data-netlify-recaptcha="true"></div>
         <button class="btn btn-primario" type="submit">Quiero empezar</button>
       </form>
       <p class="alt-wa">¿Preferís WhatsApp? Escribile a <a href="{wa_link(p.wa)}" target="_blank" rel="noopener" data-ubicacion="cta">Caro</a> o a <a href="{wa_link2(p.wa)}" target="_blank" rel="noopener" data-ubicacion="cta-marian">Marian</a></p>
