@@ -7,7 +7,7 @@
  *    y devuelve SOLO los datos de ese alumno. También guarda las opiniones.
  *  - configurar(): crea las pestañas de la planilla con sus encabezados (se corre una vez).
  *  - crearFormularioDevoluciones(): crea el formulario para las docentes (se corre una vez).
- *  - actualizarFormulario(): refresca la lista de alumnos y módulos del formulario (se dispara solo).
+ *  - actualizarFormulario(): refresca la lista de alumnos del formulario (se dispara solo).
  *
  * El ID de cliente de Google se guarda en Propiedades del script con la clave CLIENT_ID.
  */
@@ -173,7 +173,6 @@ function datosDelAlumno(a, usuario) {
     .filter(d => extraerMail(d['Alumno']) === email)
     .map(d => ({
       fecha: texto(Object.values(d)[0]),
-      modulo: texto(d['Módulo']),
       habilidades: ['Speaking', 'Listening', 'Reading', 'Writing'].map(h => ({
         nombre: h, nivel: texto(d['¿Cómo está en cada habilidad? [' + h + ']'])
       })),
@@ -266,7 +265,6 @@ function crearFormularioDevoluciones() {
                       'del portal de ese alumno.');
   form.setCollectEmail(true);
   form.addListItem().setTitle('Alumno').setRequired(true);
-  form.addListItem().setTitle('Módulo').setRequired(true);
   form.addGridItem().setTitle('¿Cómo está en cada habilidad?')
     .setRows(['Speaking', 'Listening', 'Reading', 'Writing'])
     .setColumns(['Inicial', 'En progreso', 'Logrado', 'Destacado']);
@@ -289,13 +287,17 @@ function actualizarFormulario() {
   const id = PropertiesService.getScriptProperties().getProperty('FORM_ID');
   if (!id) return;
   const form = FormApp.openById(id);
-  const listas = form.getItems(FormApp.ItemType.LIST).map(i => i.asListItem());
+  const lista = form.getItems(FormApp.ItemType.LIST).map(i => i.asListItem())
+    .find(i => i.getTitle() === 'Alumno');
+  if (!lista) return;
   const alumnos = filas('alumnos')
     .filter(a => texto(a['Mail de Google']) && !/^no$/i.test(texto(a['Activo'])))
     .map(a => texto(a['Nombre']) + ' <' + texto(a['Mail de Google']).toLowerCase() + '>');
-  const modulos = filas('programas')
-    .map(p => [texto(p['Curso']), texto(p['Nivel']), texto(p['Módulo N°']) + ' · ' + texto(p['Módulo'])]
-      .filter(Boolean).join(' · '));
-  if (alumnos.length) listas[0].setChoiceValues(alumnos);
-  if (modulos.length) listas[1].setChoiceValues(modulos);
+  if (alumnos.length) lista.setChoiceValues(alumnos);
+}
+
+// Se corrió una vez (16/11/2026) para sacar la pregunta «Módulo» del formulario ya creado.
+function quitarPreguntaModulo() {
+  const form = FormApp.openById(PropertiesService.getScriptProperties().getProperty('FORM_ID'));
+  form.getItems().filter(i => i.getTitle() === 'Módulo').forEach(i => form.deleteItem(i));
 }

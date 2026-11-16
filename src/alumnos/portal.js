@@ -303,18 +303,16 @@
   }
 
   const NIVELES = ['Inicial', 'En progreso', 'Logrado', 'Destacado'];
-  function nombreModulo(m) {
-    const a = datos.alumno;
-    let t = String(m || '');
-    [a.curso, a.nivel].forEach(p => { if (p && t.indexOf(p + ' · ') === 0) t = t.slice(p.length + 3); });
-    return /^\d+\s·/.test(t) ? 'Módulo ' + t : t;
+  function fechaLarga(f) {
+    const m = String(f || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    return m ? `${Number(m[1])} de ${MESES[Number(m[2]) - 1]} de ${m[3]}` : String(f || '');
   }
   function lineas(t) { return String(t || '').split(/\n+/).map(s => s.trim()).filter(Boolean); }
 
   function vProgreso() {
     const d = datos.devoluciones;
     if (!d.length) return `<div class="p-head"><p class="p-eyebrow">${esc(datos.alumno.curso)}</p><h1 class="p-h1">Tu progreso</h1></div>
-      <section class="p-card"><p class="p-muted">Al cerrar cada módulo, tu profe te deja una devolución con lo que ya lográs y en qué seguir trabajando. Cuando esté lista, la vas a ver acá.</p></section>`;
+      <section class="p-card"><p class="p-muted">Cada tanto, tu profe te deja una devolución con lo que ya lográs y en qué seguir trabajando. Cuando esté lista, la vas a ver acá.</p></section>`;
     const sel = Math.min(Number(leer('pth-dev') || 0), d.length - 1);
     const u = d[sel];
     const habil = u.habilidades.filter(h => h.nivel).map(h => {
@@ -324,10 +322,10 @@
     }).join('');
     const lista = t => `<ul class="p-puntos">${lineas(t).map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
     return `<div class="p-head"><p class="p-eyebrow">${esc(datos.alumno.curso)}</p><h1 class="p-h1">Tu progreso</h1>
-        <p class="p-lead">Al cerrar cada módulo, tu profe te deja una devolución: lo que ya lográs y en qué seguir trabajando.</p></div>
+        <p class="p-lead">Cada tanto, tu profe te deja una devolución: lo que ya lográs y en qué seguir trabajando.</p></div>
       <div class="p-grid p-grid-3">
         <section class="p-card p-span2" aria-labelledby="dev-t">
-          <div class="p-fila"><div><p class="p-eyebrow">${sel === 0 ? 'Última devolución' : 'Devolución'}</p><h2 id="dev-t" class="p-h2">${esc(nombreModulo(u.modulo))}</h2></div><span class="p-muted">${esc(u.fecha)}</span></div>
+          <div class="p-fila"><div><p class="p-eyebrow">${sel === 0 ? 'Última devolución' : 'Devolución'}</p><h2 id="dev-t" class="p-h2">${esc(fechaLarga(u.fecha))}</h2></div></div>
           ${u.mensaje ? `<figure class="p-mensaje"><blockquote>${esc(u.mensaje)}</blockquote><figcaption>Tu profe</figcaption></figure>` : ''}
           ${habil ? `<h3 class="p-h4">Cómo vas en cada habilidad</h3><div class="p-habs">${habil}</div><p class="p-chico">Escala: ${NIVELES.join(' · ')}</p>` : ''}
           <div class="p-grid p-grid-2">
@@ -336,7 +334,7 @@
           </div>
         </section>
         <section class="p-card" aria-labelledby="ant-t"><h2 id="ant-t" class="p-h3">Todas tus devoluciones</h2>
-          <ul class="p-lista p-lista-col">${d.map((x, i) => `<li><button type="button" class="p-link" data-dev="${i}"${i === sel ? ' aria-current="true"' : ''}><b>${esc(nombreModulo(x.modulo))}</b><span class="p-muted">${esc(x.fecha)}</span></button></li>`).join('')}</ul>
+          <ul class="p-lista p-lista-col">${d.map((x, i) => `<li><button type="button" class="p-link" data-dev="${i}"${i === sel ? ' aria-current="true"' : ''}><b>${esc(fechaLarga(x.fecha))}</b>${i === 0 ? '<span class="p-muted">Última</span>' : ''}</button></li>`).join('')}</ul>
         </section>
       </div>`;
   }
@@ -363,7 +361,7 @@
           </form>
         </section>
         <aside class="p-card p-crema"><h2 class="p-h3">¿Qué hacemos con lo que nos contás?</h2>
-          <ul class="p-puntos"><li>Lo leen Marian y Caro, nadie más.</li><li>Si dejás tu nombre, te respondemos.</li><li>Al cerrar cada módulo te pedimos una opinión corta.</li></ul>
+          <ul class="p-puntos"><li>Lo leen Marian y Caro, nadie más.</li><li>Si dejás tu nombre, te respondemos.</li><li>Cada tanto te pedimos una opinión corta.</li></ul>
         </aside>
       </div>`;
   }
