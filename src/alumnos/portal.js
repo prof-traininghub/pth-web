@@ -326,7 +326,7 @@
       <div class="p-grid p-grid-3">
         <section class="p-card p-span2" aria-labelledby="dev-t">
           <div class="p-fila"><div><p class="p-eyebrow">${sel === 0 ? 'Última devolución' : 'Devolución'}</p><h2 id="dev-t" class="p-h2">${esc(fechaLarga(u.fecha))}</h2></div></div>
-          ${u.mensaje ? `<figure class="p-mensaje"><blockquote>${esc(u.mensaje)}</blockquote><figcaption>Tu profe</figcaption></figure>` : ''}
+          ${u.mensaje ? `<figure class="p-mensaje"><blockquote>${esc(u.mensaje)}</blockquote><figcaption>${esc(u.docente || 'Tu profe')}</figcaption></figure>` : ''}
           ${habil ? `<h3 class="p-h4">Cómo vas en cada habilidad</h3><div class="p-habs">${habil}</div><p class="p-chico">Escala: ${NIVELES.join(' · ')}</p>` : ''}
           <div class="p-grid p-grid-2">
             ${u.bien ? `<div class="p-caja"><h3 class="p-h4">Lo que hacés muy bien</h3>${lista(u.bien)}</div>` : ''}

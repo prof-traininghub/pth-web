@@ -23,10 +23,11 @@ const HOJAS = {
   programas: ['Curso', 'Nivel', 'Módulo N°', 'Módulo', 'Temas', 'Bibliografía', 'Link de tareas',
               'Link de práctica', 'Fecha de examen', 'Link del examen'],
   opiniones: ['Fecha', 'Mail de Google', 'Nombre', 'Curso', 'Nota', 'Tema', 'Lo que más sirve', 'Qué cambiaría'],
-  config: ['Clave', 'Valor']
+  config: ['Clave', 'Valor'],
+  docentes: ['Docente']
 };
 const NOMBRES = { alumnos: 'Alumnos', cuotas: 'Cuotas', programas: 'Programas', opiniones: 'Opiniones',
-                  config: 'Config', devoluciones: 'Devoluciones' };
+                  config: 'Config', docentes: 'Docentes', devoluciones: 'Devoluciones' };
 const CONFIG_INICIAL = [
   ['Alias', ''], ['Titular de la cuenta', ''], ['Banco', ''],
   ['WhatsApp Caro', '5491134953141'], ['WhatsApp Marian', '5491153350085'],
@@ -176,6 +177,7 @@ function datosDelAlumno(a, usuario) {
       habilidades: ['Speaking', 'Listening', 'Reading', 'Writing'].map(h => ({
         nombre: h, nivel: texto(d['¿Cómo está en cada habilidad? [' + h + ']'])
       })),
+      docente: texto(d['Docente']),
       bien: texto(d['Lo que hace muy bien']),
       seguir: texto(d['Para seguir trabajando']),
       mensaje: texto(d['Mensaje para el alumno'])
@@ -263,7 +265,7 @@ function crearFormularioDevoluciones() {
   const form = FormApp.create('Devolución de fin de módulo · PTH');
   form.setDescription('Para las docentes de Professional Training Hub. Lo que completes aparece en «Tu progreso» ' +
                       'del portal de ese alumno.');
-  form.setCollectEmail(true);
+  form.addListItem().setTitle('Docente').setRequired(true);
   form.addListItem().setTitle('Alumno').setRequired(true);
   form.addGridItem().setTitle('¿Cómo está en cada habilidad?')
     .setRows(['Speaking', 'Listening', 'Reading', 'Writing'])
@@ -287,8 +289,11 @@ function actualizarFormulario() {
   const id = PropertiesService.getScriptProperties().getProperty('FORM_ID');
   if (!id) return;
   const form = FormApp.openById(id);
-  const lista = form.getItems(FormApp.ItemType.LIST).map(i => i.asListItem())
-    .find(i => i.getTitle() === 'Alumno');
+  const listas = form.getItems(FormApp.ItemType.LIST).map(i => i.asListItem());
+  const lista = listas.find(i => i.getTitle() === 'Alumno');
+  const listaDocentes = listas.find(i => i.getTitle() === 'Docente');
+  const docentes = filas('docentes').map(d => texto(d['Docente'])).filter(Boolean);
+  if (listaDocentes && docentes.length) listaDocentes.setChoiceValues(docentes);
   if (!lista) return;
   const alumnos = filas('alumnos')
     .filter(a => texto(a['Mail de Google']) && !/^no$/i.test(texto(a['Activo'])))
@@ -300,4 +305,27 @@ function actualizarFormulario() {
 function quitarPreguntaModulo() {
   const form = FormApp.openById(PropertiesService.getScriptProperties().getProperty('FORM_ID'));
   form.getItems().filter(i => i.getTitle() === 'Módulo').forEach(i => form.deleteItem(i));
+}
+
+// Se corrió una vez (16/11/2026): deja de pedir el correo y agrega el desplegable «Docente»,
+// que se llena con la pestaña Docentes.
+const DOCENTES_INICIALES = ['Antonella López', 'Carolina Capello', 'Julieta Bocalandro', 'Mariana Bianchi',
+  'Martina Farinola', 'Román Pernicone', 'Romina De Rose'];
+function pedirNombreDocente() {
+  const ss = planilla();
+  let h = ss.getSheetByName(NOMBRES.docentes);
+  if (!h) {
+    h = ss.insertSheet(NOMBRES.docentes);
+    h.getRange(1, 1).setValue('Docente').setFontWeight('bold').setBackground('#1d231f').setFontColor('#ffffff');
+    h.setFrozenRows(1);
+    h.getRange(2, 1, DOCENTES_INICIALES.length, 1).setValues(DOCENTES_INICIALES.map(n => [n]));
+  }
+  const form = FormApp.openById(PropertiesService.getScriptProperties().getProperty('FORM_ID'));
+  try { form.setEmailCollectionType(FormApp.EmailCollectionType.DO_NOT_COLLECT); }
+  catch (e) { form.setCollectEmail(false); }
+  if (!form.getItems().some(i => i.getTitle() === 'Docente')) {
+    const item = form.addListItem().setTitle('Docente').setRequired(true);
+    form.moveItem(item.getIndex(), 0);
+  }
+  actualizarFormulario();
 }
