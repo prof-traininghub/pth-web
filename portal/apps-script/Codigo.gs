@@ -1,6 +1,6 @@
 /**
  * Portal del alumno · Professional Training Hub
- * Apps Script vinculado a la planilla «Portal del alumno PTH» (cuenta de Google de PTH).
+ * Proyecto de Apps Script (cuenta de Google de PTH) que trabaja sobre la planilla «Portal del alumno PTH».
  *
  * Qué hace:
  *  - doPost: recibe el pedido del portal (proftraininghub.com.ar/alumnos/), valida el ingreso con Google
@@ -13,6 +13,8 @@
  */
 
 const ZONA = 'America/Argentina/Buenos_Aires';
+const PLANILLA_ID = '1mwn40Wy51VBr_okTq6Ep3iRctiQs1rv8OHONMGg2Lxc';
+function planilla() { return SpreadsheetApp.openById(PLANILLA_ID); }
 
 const HOJAS = {
   alumnos: ['Mail de Google', 'Nombre', 'Curso', 'Nivel', 'Módulo actual', 'Día', 'Hora inicio', 'Hora fin',
@@ -73,7 +75,7 @@ function verificarToken(token) {
 /* ---------------- Lectura de la planilla ---------------- */
 
 function hoja(clave) {
-  return SpreadsheetApp.getActive().getSheetByName(NOMBRES[clave]);
+  return planilla().getSheetByName(NOMBRES[clave]);
 }
 
 function filas(clave) {
@@ -213,7 +215,7 @@ function guardarOpinion(a, o) {
 /* ---------------- Puesta en marcha (se corren una vez desde el editor) ---------------- */
 
 function configurar() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilla();
   Object.keys(HOJAS).forEach(clave => {
     let h = ss.getSheetByName(NOMBRES[clave]);
     if (!h) h = ss.insertSheet(NOMBRES[clave]);
@@ -235,11 +237,12 @@ function configurar() {
   hoja('cuotas').getRange('E2:E').setDataValidation(estados);
 
   const sobrante = ss.getSheetByName('Hoja 1') || ss.getSheetByName('Sheet1');
-  if (sobrante && sobrante.getLastRow() === 0 && ss.getSheets().length > 1) ss.deleteSheet(sobrante);
+  if (sobrante && ss.getSheets().length > 1) ss.deleteSheet(sobrante);
+  ss.rename('Portal del alumno PTH');
 }
 
 function crearFormularioDevoluciones() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = planilla();
   const form = FormApp.create('Devolución de fin de módulo · PTH');
   form.setDescription('Para las docentes de Professional Training Hub. Lo que completes aparece en «Tu progreso» ' +
                       'del portal de ese alumno.');
