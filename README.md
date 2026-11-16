@@ -20,7 +20,7 @@ python3 build.py --preview  # genera preview/ para revisar sin servidor
 
 ## Publicar
 
-El repositorio está conectado a Netlify: cada cambio que se sube a la rama `main` se publica solo. Netlify corre `python3 build.py` y publica `dist/` (ver `netlify.toml`).
+El repositorio (público, para que el plan gratis de Netlify publique cambios de más de un colaborador) está conectado a Netlify: cada cambio que se sube a la rama `main` se publica solo. Netlify corre `python3 build.py` y publica `dist/` (ver `netlify.toml`).
 
 - Formularios: detección activada; las consultas de los tres formularios (`consulta-rapida`, `contacto`, `empresas`) llegan por mail a prof.traininghub@gmail.com. Tienen reCAPTCHA de Netlify.
 - Analytics: GA4, ID `G-L41KL5314T` (cuenta de Google de PTH). Solo se incluye en `dist/`, no en la vista previa.
