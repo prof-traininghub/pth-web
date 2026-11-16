@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Portal del alumno | Professional Training Hub</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../assets/img/pth-favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/img/pth-favicon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PTH">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="portal.css">
+<script>window.PTH_PORTAL = { clientId: "{{CLIENT_ID}}", api: "{{SCRIPT_URL}}" };</script>
+{{GA_TAG}}
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="portal.js" defer></script>
+</head>
+<body class="portal">
+<a class="skip" href="#vista">Saltar al contenido</a>
+<header class="p-top">
+  <div class="p-wrap p-top-in">
+    <a class="p-logo" href="#inicio" aria-label="Portal del alumno, inicio">
+      <img src="../assets/img/pth-logo-horizontal.svg" alt="Professional Training Hub" width="123" height="48">
+    </a>
+    <div class="p-user" id="usuario" hidden>
+      <span class="p-avatar" id="avatar" aria-hidden="true"></span>
+      <button class="p-salir" type="button" id="salir">Salir</button>
+    </div>
+  </div>
+  <nav class="p-nav" id="nav" aria-label="Portal" hidden>
+    <div class="p-wrap p-nav-in">
+      <a href="#inicio" data-ruta="inicio">Inicio</a>
+      <a href="#material" data-ruta="material">Programa y material</a>
+      <a href="#abono" data-ruta="abono">Abono</a>
+      <a href="#progreso" data-ruta="progreso">Tu progreso</a>
+      <a href="#opinion" data-ruta="opinion">Tu opinión</a>
+    </div>
+  </nav>
+</header>
+<main id="vista" class="p-wrap p-main" tabindex="-1">
+  <p class="p-cargando">Cargando…</p>
+</main>
+<footer class="p-pie">
+  <div class="p-wrap">
+    <a href="../">Volver a proftraininghub.com.ar</a>
+    <span>·</span>
+    <a href="../privacidad/">Privacidad</a>
+  </div>
+</footer>
+</body>
+</html>

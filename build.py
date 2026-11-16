@@ -46,6 +46,9 @@ def rel(pagina, destino):
     return pre + destino
 
 
+# Portal del alumno (/alumnos/): se completan al configurar Google (ver portal/README.md)
+PORTAL_CLIENT_ID = ""
+PORTAL_API = ""
 GA_ID = "G-L41KL5314T"
 GA_TAG = f'''<script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','{GA_ID}');</script>'''
@@ -964,6 +967,20 @@ def borradores():
     ]
 
 
+def portal():
+    """Copia el portal del alumno a /alumnos/ y le pone la configuración."""
+    destino = os.path.join(OUT, "alumnos")
+    shutil.copytree(os.path.join(SRC, "alumnos"), destino)
+    ruta = os.path.join(destino, "index.html")
+    with open(ruta, encoding="utf-8") as fh:
+        html = fh.read()
+    html = (html.replace("{{CLIENT_ID}}", PORTAL_CLIENT_ID or "{{CLIENT_ID}}")
+                .replace("{{SCRIPT_URL}}", PORTAL_API)
+                .replace("{{GA_TAG}}", "" if PREVIEW else GA_TAG))
+    with open(ruta, "w", encoding="utf-8") as fh:
+        fh.write(html)
+
+
 def escribir(base, p):
     destino = os.path.join(base, p.ruta if p.ruta.endswith(".html") else p.ruta + "index.html")
     os.makedirs(os.path.dirname(destino), exist_ok=True)
@@ -979,6 +996,7 @@ def main():
     ps = paginas()
     for p in ps:
         escribir(OUT, p)
+    portal()
     if PREVIEW:
         for p in borradores():
             escribir(OUT, p)
@@ -994,7 +1012,8 @@ def main():
             fh.write("https://www.proftraininghub.com.ar/* https://proftraininghub.com.ar/:splat 301!\n")
         with open(os.path.join(OUT, "_headers"), "w") as fh:
             fh.write("/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: SAMEORIGIN\n"
-                     "/assets/*\n  Cache-Control: public, max-age=86400\n")
+                     "/assets/*\n  Cache-Control: public, max-age=86400\n"
+                     "/alumnos/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-cache\n")
         # borradores: fuera de dist, no se publican
         bdir = os.path.join(ROOT, "borradores")
         shutil.rmtree(bdir, ignore_errors=True)
