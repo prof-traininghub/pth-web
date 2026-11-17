@@ -7,7 +7,7 @@
   const vista = document.getElementById('vista');
   const nav = document.getElementById('nav');
   const usuarioBox = document.getElementById('usuario');
-  const RUTAS = ['inicio', 'material', 'bibliografia', 'abono', 'progreso', 'opinion'];
+  const RUTAS = ['inicio', 'material', 'abono', 'progreso', 'opinion'];
   const CLAVE = 'pth-portal-token';
   let datos = null;
   let token = null;
@@ -159,9 +159,8 @@
   function mostrar() {
     if (!datos) return;
     const r = rutaActual();
-    const tab = r === 'bibliografia' ? 'material' : r;
-    nav.querySelectorAll('a').forEach(a => a.toggleAttribute('aria-current', a.dataset.ruta === tab));
-    const fn = { inicio: vInicio, material: vMaterial, bibliografia: vBibliografia, abono: vAbono, progreso: vProgreso, opinion: vOpinion }[r];
+    nav.querySelectorAll('a').forEach(a => a.toggleAttribute('aria-current', a.dataset.ruta === r));
+    const fn = { inicio: vInicio, material: vMaterial, abono: vAbono, progreso: vProgreso, opinion: vOpinion }[r];
     vista.innerHTML = fn();
     enlazar(r);
     window.scrollTo(0, 0);
@@ -214,8 +213,7 @@
       <section class="p-sec" aria-labelledby="mat-t">
         <h2 id="mat-t" class="p-h2">Tu material</h2>
         <div class="p-accesos">
-          <a href="#material"><b>Programa</b><span>Módulos, temas y exámenes de tu nivel.</span></a>
-          <a href="#bibliografia"><b>Bibliografía</b><span>Lo que usamos en cada módulo.</span></a>
+          <a href="#material"><b>Programa</b><span>Módulos, temas, bibliografía y exámenes de tu nivel.</span></a>
           ${url(a.classroom) ? `<a ${ext} href="${url(a.classroom)}"><b>Material extra</b><span>Tareas y práctica, en Classroom.</span></a>` : ''}
           <a href="#progreso"><b>Tu progreso</b><span>Las devoluciones de tu profe.</span></a>
         </div>
@@ -279,18 +277,6 @@
           </section>
         </div>
       </div>`;
-  }
-
-  function vBibliografia() {
-    const a = datos.alumno;
-    const conBiblio = datos.programa.filter(m => m.bibliografia.length);
-    const bloques = conBiblio.map(m => `<section class="p-card${m.estado === 'en curso' ? ' p-modulo-actual' : ''}" aria-label="Módulo ${esc(m.n)}">
-        <div class="p-fila"><h2 class="p-h3">Módulo ${esc(m.n)} · ${esc(m.nombre)}</h2>${m.estado === 'en curso' ? '<span class="p-chip p-chip-acento">En curso</span>' : ''}</div>
-        <ul class="p-lista">${m.bibliografia.map(b => `<li><span>${esc(b.texto)}</span>${url(b.link) ? `<a ${ext} href="${url(b.link)}">Abrir</a>` : ''}</li>`).join('')}</ul>
-      </section>`).join('');
-    return `<div class="p-head"><p class="p-eyebrow">${esc(a.curso)}${a.nivel ? ' · ' + esc(a.nivel) : ''}</p><h1 class="p-h1">Bibliografía</h1>
-        <p class="p-lead">Los textos y materiales que usamos en cada módulo.</p></div>
-      <div class="p-col">${bloques || '<section class="p-card"><p class="p-muted">Todavía no hay bibliografía cargada.</p></section>'}</div>`;
   }
 
   function vAbono() {
