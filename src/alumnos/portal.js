@@ -280,20 +280,22 @@
   }
 
   function vAbono() {
-    const cuotas = datos.cuotas, cfg = datos.config, a = datos.alumno;
+    const cuotas = datos.cuotas, a = datos.alumno, cuentas = datos.config.cuentas || [];
     const pend = cuotas.filter(c => !/pagad/i.test(c.estado));
     const tarjetas = pend.length ? pend.map(c => `
       <section class="p-card" aria-label="Cuota de ${esc(c.mes)}">
         <div class="p-fila"><h2 class="p-h3">Cuota de ${esc(c.mes)}</h2>${chipCuota(c)}</div>
         ${c.monto ? `<p class="p-monto">${esc(c.monto)}</p>` : ''}
-        ${cfg.alias ? `<div class="p-pago">
-          <p class="p-eyebrow p-mini">Pagá por transferencia</p>
-          <dl class="p-datos p-datos-claro">
-            <div><dt>Alias</dt><dd><span id="alias">${esc(cfg.alias)}</span> <button class="p-copiar" type="button" data-copiar="${esc(cfg.alias)}">${ICONOS.copiar}Copiar</button></dd></div>
-            ${cfg.titular ? `<div><dt>Titular</dt><dd>${esc(cfg.titular)}</dd></div>` : ''}
-            ${cfg.banco ? `<div><dt>Banco</dt><dd>${esc(cfg.banco)}</dd></div>` : ''}
-          </dl>
-          ${cfg.waCaro ? `<a class="btn btn-sec" ${ext} href="${wa(cfg.waCaro, 'Hola, te mando el comprobante de la cuota de ' + c.mes + ' de ' + a.nombre + '.')}">Ya transferí: mandar el comprobante</a>` : ''}
+        ${cuentas.length ? `<div class="p-pago">
+          <p class="p-eyebrow p-mini">${cuentas.length > 1 ? 'Pagá por transferencia a cualquiera de estas cuentas' : 'Pagá por transferencia'}</p>
+          <div class="p-cuentas">${cuentas.map(k => `<div class="p-cuenta">
+            <p class="p-cuenta-tit"><b>${esc(k.titular)}</b>${k.entidad ? ` · ${esc(k.entidad)}` : ''}</p>
+            <dl class="p-datos p-datos-claro">
+              ${k.alias ? `<div><dt>Alias</dt><dd><span>${esc(k.alias)}</span> <button class="p-copiar" type="button" data-copiar="${esc(k.alias)}">${ICONOS.copiar}Copiar</button></dd></div>` : ''}
+              ${k.cvu ? `<div><dt>CVU</dt><dd><span class="p-cvu">${esc(k.cvu)}</span> <button class="p-copiar" type="button" data-copiar="${esc(k.cvu)}">${ICONOS.copiar}Copiar</button></dd></div>` : ''}
+            </dl>
+            ${k.wa ? `<a class="btn btn-sec" ${ext} href="${wa(k.wa, 'Hola, te mando el comprobante de la cuota de ' + c.mes + ' de ' + a.nombre + '.')}">Ya transferí: mandar el comprobante${cuentas.length > 1 ? ' a ' + esc(primerNombre(k.titular)) : ''}</a>` : ''}
+          </div>`).join('')}</div>
           <p class="p-chico">La marcamos como pagada cuando la confirmamos.</p>
         </div>` : '<p class="p-muted">Consultá con PTH cómo pagar.</p>'}
       </section>`).join('') : `<section class="p-card"><div class="p-fila"><h2 class="p-h3">Estás al día</h2><span class="p-chip p-chip-ok">${ICONOS.ok}Al día</span></div>

@@ -21,7 +21,7 @@ No hay contraseñas ni claves secretas en este repositorio: el ID de cliente y l
 | Docentes | Un nombre por fila. Es la lista del desplegable «Docente» del formulario. |
 | Devoluciones | La llena el formulario de las docentes (Devolución para el alumno · PTH). |
 | Opiniones | La llena el portal cuando un alumno envía su opinión. |
-| Config | Alias, titular y banco para transferencias; WhatsApp de Caro y Marian; mensaje opcional para el inicio. |
+| Config | Cuentas para transferir («Cuenta 1 · Titular / Entidad / Alias / CVU / WhatsApp», ídem Cuenta 2); WhatsApp de Caro y Marian; mensaje opcional para el inicio. El CVU va con formato de texto para que no se pierdan dígitos. |
 
 ## Cambios en el script
 

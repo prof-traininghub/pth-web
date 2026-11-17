@@ -31,7 +31,8 @@ const NOMBRES = { alumnos: 'Alumnos', cuotas: 'Cuotas', programas: 'Programas', 
                   config: 'Config', docentes: 'Docentes', niveles: 'Niveles',
                   devoluciones: 'Devoluciones' };
 const CONFIG_INICIAL = [
-  ['Alias', ''], ['Titular de la cuenta', ''], ['Banco', ''],
+  ['Cuenta 1 · Titular', ''], ['Cuenta 1 · Entidad', ''], ['Cuenta 1 · Alias', ''], ['Cuenta 1 · CVU', ''], ['Cuenta 1 · WhatsApp', ''],
+  ['Cuenta 2 · Titular', ''], ['Cuenta 2 · Entidad', ''], ['Cuenta 2 · Alias', ''], ['Cuenta 2 · CVU', ''], ['Cuenta 2 · WhatsApp', ''],
   ['WhatsApp Caro', '5491134953141'], ['WhatsApp Marian', '5491153350085'],
   ['Mensaje del inicio', '']
 ];
@@ -132,6 +133,19 @@ function config() {
   return c;
 }
 
+// Cuentas para transferir: filas «Cuenta N · Titular / Entidad / Alias / CVU / WhatsApp» de Config.
+function cuentasDePago(c) {
+  const cuentas = [];
+  for (let n = 1; n <= 4; n++) {
+    const k = 'Cuenta ' + n + ' · ';
+    const alias = c[k + 'Alias'] || '', cvu = (c[k + 'CVU'] || '').replace(/\D/g, '');
+    if (!alias && !cvu) continue;
+    cuentas.push({ titular: c[k + 'Titular'] || '', entidad: c[k + 'Entidad'] || '', alias: alias, cvu: cvu,
+                   wa: (c[k + 'WhatsApp'] || '').replace(/\D/g, '') });
+  }
+  return cuentas;
+}
+
 function bibliografia(valor) {
   // Una línea por material: «Texto | link» (el link es opcional)
   return texto(valor).split(/\n+/).map(l => l.trim()).filter(Boolean).map(l => {
@@ -204,7 +218,7 @@ function datosDelAlumno(a, usuario) {
     cuotas: cuotas,
     devoluciones: devoluciones,
     config: {
-      alias: c['Alias'] || '', titular: c['Titular de la cuenta'] || '', banco: c['Banco'] || '',
+      cuentas: cuentasDePago(c),
       waCaro: c['WhatsApp Caro'] || '', waMarian: c['WhatsApp Marian'] || '',
       mensaje: c['Mensaje del inicio'] || ''
     }
@@ -361,4 +375,23 @@ function crearPestanaNiveles() {
   });
   const valores = Object.values(pares);
   if (valores.length) h.getRange(2, 1, valores.length, 3).setValues(valores);
+}
+
+// Se corrió una vez (17/11/2026): reemplaza Alias/Titular/Banco de Config por dos cuentas de Mercado Pago.
+// El CVU lo carga PTH a mano (la celda queda en formato texto para que no se pierdan dígitos).
+function cuentasEnConfig() {
+  const h = hoja('config');
+  const viejas = ['Alias', 'Titular de la cuenta', 'Banco'];
+  for (let r = h.getLastRow(); r >= 2; r--) {
+    if (viejas.indexOf(texto(h.getRange(r, 1).getValue())) >= 0) h.deleteRow(r);
+  }
+  const filasNuevas = [
+    ['Cuenta 1 · Titular', 'Carolina Capello'], ['Cuenta 1 · Entidad', 'Mercado Pago'],
+    ['Cuenta 1 · Alias', 'capellocarolina'], ['Cuenta 1 · CVU', ''], ['Cuenta 1 · WhatsApp', '5491134953141'],
+    ['Cuenta 2 · Titular', 'Mariana Bianchi'], ['Cuenta 2 · Entidad', 'Mercado Pago'],
+    ['Cuenta 2 · Alias', 'mariana.pth'], ['Cuenta 2 · CVU', ''], ['Cuenta 2 · WhatsApp', '5491153350085']
+  ];
+  h.insertRowsAfter(1, filasNuevas.length);
+  h.getRange(2, 2, filasNuevas.length, 1).setNumberFormat('@');
+  h.getRange(2, 1, filasNuevas.length, 2).setValues(filasNuevas);
 }

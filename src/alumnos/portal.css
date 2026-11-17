@@ -162,3 +162,11 @@
 .p-avance-claro .p-avance-barra span.on { background: var(--ink); }
 .p-avance-claro .p-avance-barra span.act { background: repeating-linear-gradient(-45deg, var(--ink) 0 4px, transparent 4px 8px); outline-color: var(--ink); }
 .p-sec-sm { margin-bottom: 20px; }
+
+/* Cuentas para transferir */
+.p-cuentas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.p-cuenta { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.p-cuenta-tit { margin: 0; }
+.p-cuenta .p-datos { grid-template-columns: 1fr; }
+.p-cvu { font-variant-numeric: tabular-nums; letter-spacing: .02em; word-break: break-all; }
+.p-cuenta .btn { white-space: normal; text-align: center; }
