@@ -690,3 +690,13 @@ function activarAvisos() {
   secretoSesion();
   datosCambiaron();
 }
+
+// Diagnóstico: valida el permiso para enviar con Firebase sin mandar nada (debe responder 400 por el token falso).
+function probarFirebase() {
+  const r = UrlFetchApp.fetch('https://fcm.googleapis.com/v1/projects/' + PROYECTO_FIREBASE + '/messages:send', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+    payload: JSON.stringify({ validate_only: true, message: { token: 'prueba', data: { title: 'prueba' } } })
+  });
+  Logger.log(r.getResponseCode() + ' ' + r.getContentText().slice(0, 300));
+}

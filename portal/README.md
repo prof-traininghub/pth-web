@@ -31,7 +31,7 @@ Editar `portal/apps-script/Codigo.gs`, pegarlo en el proyecto de Apps Script «P
 
 ## Avisos al celular
 
-- Se mandan con Firebase Cloud Messaging (proyecto `portal-alumno-pth`, cuenta de PTH). La configuración pública de la app web está en `PORTAL_FIREBASE` de `build.py`.
+- Se mandan con Firebase Cloud Messaging (proyecto `portal-alumno-pth`, cuenta de PTH). El proyecto de Apps Script está vinculado a ese proyecto de Google Cloud (n.º 906483008838) y su manifiesto está en `apps-script/appsscript.json`. La configuración pública de la app web está en `PORTAL_FIREBASE` de `build.py`.
 - El activador `enviarAvisos` corre cada 5 minutos: avisos manuales de la pestaña Avisos, «tu clase empieza en N minutos» (entre 5 y 14 minutos antes) y cuota vencida pendiente (a las 10, y cada 7 días mientras siga pendiente).
 - En iPhone solo llegan si el alumno agregó el portal a la pantalla de inicio desde Safari.
 
