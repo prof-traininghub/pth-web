@@ -12,7 +12,6 @@
   const CLAVE_SESION = 'pth-portal-sesion';  // sesión propia del portal (30 días)
   const CLAVE_DATOS = 'pth-portal-datos';    // últimos datos, para mostrar al instante
   const CLAVE_FCM = 'pth-portal-fcm';        // este dispositivo tiene los avisos activados
-  const CLAVE_BANNER = 'pth-avisos-oculto';
   let datos = null;
   let token = null;
   let sesion = null;
@@ -109,6 +108,7 @@
     if (fcm) { api('avisos-baja', { fcm }).catch(() => {}); guardarL(CLAVE_FCM, null); quitarTokenFirebase(); }
     olvidarSesion();
     nav.hidden = true; usuarioBox.hidden = true;
+    document.querySelectorAll('.p-solo-sesion').forEach(e => { e.hidden = true; });
     conGoogle(() => { google.accounts.id.disableAutoSelect(); pantallaIngreso(); });
   }
   document.getElementById('salir').addEventListener('click', salir);
@@ -141,7 +141,7 @@
         // Si está escribiendo su opinión, no le borramos el formulario.
         if (primera || rutaActual() !== 'opinion') mostrar(!primera);
       }
-      refrescarAvisos();
+      prepararAvisos();
     } catch (e) {
       if (enSegundoPlano) return;
       vista.innerHTML = `<section class="p-card p-centro"><h1 class="p-h1">No pudimos cargar tus datos</h1>
@@ -156,6 +156,7 @@
     const av = document.getElementById('avatar');
     av.textContent = iniciales(a.nombre);
     usuarioBox.hidden = false; nav.hidden = false;
+    document.querySelectorAll('.p-solo-sesion').forEach(e => { e.hidden = false; });
   }
 
   /* ---------- pantallas sin sesión ---------- */
@@ -206,7 +207,6 @@
     const fn = { inicio: vInicio, material: vMaterial, abono: vAbono, progreso: vProgreso, opinion: vOpinion, avisos: vAvisos }[r];
     vista.innerHTML = fn();
     enlazar(r);
-    marcarCampana();
     if (!sinMover) window.scrollTo(0, 0);
   }
   window.addEventListener('hashchange', () => { mostrar(); vista.focus({ preventScroll: true }); });
@@ -232,7 +232,6 @@
         <h1 class="p-h1">¡Hola, ${esc(primerNombre(a.nombre))}!</h1>
         ${datos.config.mensaje ? `<p class="p-lead">${esc(datos.config.mensaje)}</p>` : ''}
       </div>
-      ${bannerAvisos()}
       <div class="p-grid p-grid-3">
         <section class="p-card p-negro p-span2" aria-labelledby="clase-t">
           <p class="p-eyebrow p-amarillo">Tu próxima clase</p>
@@ -432,8 +431,6 @@
 
   /* ---------- interacción ---------- */
   function enlazar(r) {
-    const bNo = document.getElementById('banner-no');
-    if (bNo) bNo.addEventListener('click', () => { guardarL(CLAVE_BANNER, '1'); bNo.closest('.p-banner').remove(); marcarCampana(); });
     if (r === 'avisos') enlazarAvisos();
     vista.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', () => {
       const t = b.dataset.copiar;
@@ -528,6 +525,10 @@
   async function activarAvisos(p) {
     const permiso = await Notification.requestPermission();
     if (permiso !== 'granted') return permiso;
+    return suscribir(p);
+  }
+
+  async function suscribir(p) {
     const t = await tokenDeEsteDispositivo();
     const r = await api('avisos', { fcm: t, anterior: leerL(CLAVE_FCM), preferencias: p, dispositivo: nombreDispositivo() });
     if (!r.ok) throw new Error(r.error || 'avisos');
@@ -548,24 +549,32 @@
     } catch (e) { /* sin conexión o sin permiso: se reintenta la próxima vez */ }
   }
 
-  function marcarCampana() {
-    const punto = document.getElementById('campana-punto');
-    if (punto) punto.hidden = !datos || ['inactivo', 'instalar'].indexOf(estadoAvisos()) < 0;
-    const c = document.getElementById('campana');
-    if (c) c.toggleAttribute('aria-current', rutaActual() === 'avisos');
+
+
+  // Los avisos vienen activados: al primer toque en el portal el navegador pide permiso una sola vez.
+  // Si ya lo había dado (otra sesión), se suscribe sin preguntar nada.
+  const CLAVE_PEDIDO = 'pth-avisos-pedido';
+  let esperandoToque = false;
+  function prepararAvisos() {
+    const e = estadoAvisos();
+    if (e === 'activo') { refrescarAvisos(); return; }
+    if (e !== 'inactivo') return;
+    if (Notification.permission === 'granted') { suscribir(preferencias()).catch(() => {}); return; }
+    if (leerL(CLAVE_PEDIDO) || esperandoToque) return;
+    esperandoToque = true;
+    const alTocar = ev => {
+      if (ev.target.closest && ev.target.closest('#salir, #av-form')) return;
+      document.removeEventListener('click', alTocar, true);
+      esperandoToque = false;
+      guardarL(CLAVE_PEDIDO, '1');
+      activarAvisos(preferencias()).then(() => { if (rutaActual() === 'avisos') mostrar(true); }).catch(() => {});
+    };
+    document.addEventListener('click', alTocar, true);
   }
 
-  function bannerAvisos() {
-    const e = estadoAvisos();
-    if (['inactivo', 'instalar'].indexOf(e) < 0 || leerL(CLAVE_BANNER)) return '';
-    return `<section class="p-card p-banner" aria-labelledby="banner-t">
-        <span class="p-banner-ico" aria-hidden="true">${ICONOS.campana}</span>
-        <div class="p-banner-txt"><h2 id="banner-t" class="p-h3">Activá los avisos en tu celular</h2>
-          <p class="p-muted">Te recordamos tu clase 10 minutos antes y te contamos las novedades de PTH.</p></div>
-        <div class="p-btns"><a class="btn btn-primario" href="#avisos">Activar</a>
-          <button class="btn btn-sec" type="button" id="banner-no">Ahora no</button></div>
-      </section>`;
-  }
+  // Instalar la app (Android/compu: el navegador lo ofrece; iPhone: desde Safari).
+  let pedidoInstalar = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pedidoInstalar = e; });
 
   const TIPOS = [
     ['clase', 'Tu clase está por empezar', '10 minutos antes, con el link para entrar a Meet.'],
@@ -575,44 +584,55 @@
 
   function vAvisos() {
     const e = estadoAvisos(), p = preferencias();
+    const activo = e === 'activo';
     const llaves = TIPOS.map(([k, t, d]) => `<label class="p-llave">
         <span><b>${t}</b><small>${d}</small></span>
         <input type="checkbox" role="switch" name="${k}" ${p[k] ? 'checked' : ''}><i aria-hidden="true"></i>
       </label>`).join('');
-    let cuerpo = '';
+    let avisos;
     if (e === 'instalar') {
-      cuerpo = `<section class="p-card"><h2 class="p-h3">En iPhone, primero agregá el portal a tu pantalla de inicio</h2>
-        <ol class="p-pasos">
-          <li>Abrí <b>proftraininghub.com.ar/alumnos</b> en <b>Safari</b>.</li>
-          <li>Tocá el botón <b>Compartir</b> (el cuadrado con la flecha hacia arriba).</li>
-          <li>Elegí <b>Agregar a inicio</b> y después <b>Agregar</b>.</li>
-          <li>Abrí <b>PTH</b> desde el ícono nuevo, entrá a esta sección y activá los avisos.</li>
-        </ol>
-        <p class="p-chico">Es un requisito de Apple: en iPhone los avisos solo llegan a las apps agregadas al inicio.</p></section>`;
+      avisos = `<section class="p-card"><h2 class="p-h3">Avisos</h2>
+        <p class="p-muted">En iPhone, los avisos llegan cuando instalás la app (abajo te mostramos cómo). Después abrila desde el ícono y listo: quedan activados.</p></section>`;
     } else if (e === 'no-soportado') {
-      cuerpo = `<section class="p-card"><h2 class="p-h3">Este navegador no permite avisos</h2>
-        <p class="p-muted">Probá desde Chrome en tu celular Android o en la compu, o desde Safari en iPhone agregando el portal a la pantalla de inicio.</p></section>`;
+      avisos = `<section class="p-card"><h2 class="p-h3">Avisos</h2>
+        <p class="p-muted">Este navegador no permite avisos. Probá desde Chrome en tu celular Android o en la compu.</p></section>`;
     } else if (e === 'bloqueado') {
-      cuerpo = `<section class="p-card"><h2 class="p-h3">Los avisos están bloqueados</h2>
-        <p class="p-muted">Antes elegiste no recibirlos. Para activarlos, tocá el candado al lado de la dirección del sitio, entrá a <b>Notificaciones</b> y elegí <b>Permitir</b>. Después volvé a esta sección.</p></section>`;
+      avisos = `<section class="p-card"><h2 class="p-h3">Los avisos están bloqueados</h2>
+        <p class="p-muted">Para recibirlos, tocá el candado al lado de la dirección del sitio, entrá a <b>Notificaciones</b> y elegí <b>Permitir</b>.</p></section>`;
     } else {
-      const activo = e === 'activo';
-      cuerpo = `<form class="p-card p-avisos" id="av-form">
-          <div class="p-fila"><h2 class="p-h3">¿Qué querés recibir?</h2>${activo ? `<span class="p-chip p-chip-ok">${ICONOS.ok}Activados en este dispositivo</span>` : ''}</div>
+      avisos = `<form class="p-card p-avisos" id="av-form">
+          <div class="p-fila"><h2 class="p-h3">Avisos</h2>${activo ? `<span class="p-chip p-chip-ok">${ICONOS.ok}Activados</span>` : ''}</div>
+          <p class="p-muted">${activo ? 'Están todos activados. Si alguno no te sirve, apagalo acá.' : 'Tocá <b>Activar avisos</b> y después <b>Permitir</b>. Si alguno no te sirve, apagalo antes.'}</p>
           <div class="p-llaves">${llaves}</div>
           <p class="p-error" id="av-error" role="alert" hidden></p>
           <div class="p-btns">${activo
-            ? '<button class="btn btn-sec" type="button" id="av-baja">Desactivar en este dispositivo</button><span class="p-chico" id="av-ok" role="status"></span>'
+            ? '<button class="p-link-chico" type="button" id="av-baja">Desactivar todos en este dispositivo</button><span class="p-chico" id="av-ok" role="status"></span>'
             : `<button class="btn btn-primario" type="submit" id="av-alta">${ICONOS.campana}Activar avisos</button>`}</div>
-          ${activo ? '' : '<p class="p-chico">El celular te va a pedir permiso: tocá <b>Permitir</b>.</p>'}
         </form>`;
     }
-    return `<div class="p-head"><p class="p-eyebrow">Avisos</p><h1 class="p-h1">Avisos en tu celular</h1>
-        <p class="p-lead">Te avisamos cuando empieza tu clase, si tenés la cuota pendiente y cuando hay novedades.</p></div>
-      <div class="p-col">${cuerpo}</div>`;
+    let app;
+    if (instalada) app = '<p class="p-muted">Ya tenés la app instalada en este dispositivo.</p>';
+    else if (esIOS) app = `<ol class="p-pasos">
+          <li>Abrí <b>proftraininghub.com.ar/alumnos</b> en <b>Safari</b>.</li>
+          <li>Tocá <b>Compartir</b> (el cuadrado con la flecha hacia arriba).</li>
+          <li>Elegí <b>Agregar a inicio</b> y después <b>Agregar</b>.</li>
+        </ol>`;
+    else if (pedidoInstalar) app = `<div class="p-btns"><button class="btn btn-primario" type="button" id="instalar">Instalar la app</button></div>`;
+    else app = '<p class="p-muted">Abrí el menú del navegador (⋮) y elegí <b>Instalar app</b> o <b>Agregar a la pantalla de inicio</b>.</p>';
+    return `<div class="p-head"><p class="p-eyebrow">Portal del alumno</p><h1 class="p-h1">Avisos y app</h1></div>
+      <div class="p-col">${avisos}
+        <section class="p-card"><h2 class="p-h3">La app en tu celular</h2>
+          <p class="p-muted">Con el logo de PTH en tu pantalla de inicio, para entrar con un toque.</p>${app}</section>
+      </div>`;
   }
 
   function enlazarAvisos() {
+    const inst = document.getElementById('instalar');
+    if (inst) inst.addEventListener('click', async () => {
+      pedidoInstalar.prompt();
+      try { await pedidoInstalar.userChoice; } catch (e) { /* nada */ }
+      pedidoInstalar = null; mostrar(true);
+    });
     const f = document.getElementById('av-form');
     if (!f) return;
     const err = document.getElementById('av-error');
@@ -627,7 +647,7 @@
       pedido.then(res => {
         if (res === 'denied') { mostrar(true); return; }
         if (res !== 'granted') { alta.disabled = false; alta.lastChild.textContent = 'Activar avisos'; return; }
-        guardarL(CLAVE_BANNER, '1');
+        guardarL(CLAVE_PEDIDO, '1');
         mostrar(true);
       }).catch(() => {
         err.textContent = 'No pudimos activar los avisos. Revisá tu conexión y probá de nuevo.'; err.hidden = false;

@@ -191,9 +191,13 @@ def documento(p):
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#1d231f">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" href="{rel(p, "assets/img/pth-favicon.svg")}" type="image/svg+xml">
-<link rel="icon" href="{rel(p, "assets/img/pth-favicon-32.png")}" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="{rel(p, "assets/img/pth-favicon-180.png")}">
+<link rel="icon" href="{rel(p, "assets/img/pth-favicon-96.png")}" sizes="96x96" type="image/png">
+<link rel="icon" href="{rel(p, "assets/img/pth-favicon-192.png")}" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="{rel(p, "assets/img/pth-apple-touch-180.png")}">
+<link rel="manifest" href="{rel(p, "site.webmanifest")}">
+<meta name="theme-color" content="#ffffff">
 <link rel="preload" href="{rel(p, "assets/fonts/archivo-latin-800-normal.woff2")}" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="{rel(p, "assets/fonts/archivo-latin-400-normal.woff2")}" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="{rel(p, "assets/css/site.css")}">
@@ -270,7 +274,7 @@ def curso_ld(nombre, desc, ruta):
 WEBSITE_LD = {"@context": "https://schema.org", "@type": "WebSite", "name": "Professional Training Hub",
               "alternateName": ["PTH", "Prof Training Hub"], "url": DOMINIO + "/"}
 ORG_LD = {"@context": "https://schema.org", "@type": "EducationalOrganization", "name": "Professional Training Hub",
-          "alternateName": "PTH", "url": DOMINIO + "/", "logo": DOMINIO + "/assets/img/pth-favicon-512.png",
+          "alternateName": "PTH", "url": DOMINIO + "/", "logo": DOMINIO + "/assets/img/pth-app-512.png",
           "description": "Academia online de inglés para adultos: clases en vivo, individuales o en grupos reducidos.",
           "sameAs": [IG], "areaServed": "AR",
           "contactPoint": [{"@type": "ContactPoint", "contactType": "Consultas", "telephone": "+54-9-11-3495-3141",
@@ -1003,6 +1007,17 @@ def main():
     os.makedirs(OUT)
     for sub in ("css", "js", "fonts", "img"):
         shutil.copytree(os.path.join(SRC, sub), os.path.join(OUT, "assets", sub))
+    shutil.copy(os.path.join(SRC, "favicon.ico"), os.path.join(OUT, "favicon.ico"))
+    with open(os.path.join(OUT, "site.webmanifest"), "w", encoding="utf-8") as fh:
+        json.dump({
+            "name": "Professional Training Hub", "short_name": "PTH", "lang": "es-AR",
+            "start_url": "/", "display": "browser", "background_color": "#ffffff", "theme_color": "#ffffff",
+            "icons": [
+                {"src": "/assets/img/pth-app-192.png", "sizes": "192x192", "type": "image/png"},
+                {"src": "/assets/img/pth-app-512.png", "sizes": "512x512", "type": "image/png"},
+                {"src": "/assets/img/pth-app-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+            ],
+        }, fh, ensure_ascii=False, indent=2)
     ps = paginas()
     for p in ps:
         escribir(OUT, p)

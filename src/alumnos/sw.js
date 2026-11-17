@@ -1,8 +1,8 @@
 /* Portal del alumno PTH: guarda la estructura de la app para abrirla rápido
    y muestra los avisos que llegan por Firebase Cloud Messaging. */
-const CACHE = 'pth-portal-v2';
+const CACHE = 'pth-portal-v3';
 const BASE = ['./', 'portal.css', 'portal.js', 'manifest.webmanifest',
-  '../assets/css/site.css', '../assets/img/pth-logo-horizontal.svg', '../assets/img/pth-favicon-180.png'];
+  '../assets/css/site.css', '../assets/img/pth-logo-horizontal.svg', '../assets/img/pth-app-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(BASE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
@@ -25,7 +25,7 @@ self.addEventListener('push', e => {
   const titulo = m.title || 'Professional Training Hub';
   e.waitUntil(self.registration.showNotification(titulo, {
     body: m.body || '',
-    icon: '../assets/img/pth-favicon-512.png',
+    icon: '../assets/img/pth-app-192.png',
     badge: '../assets/img/pth-favicon-180.png',
     tag: m.tag || undefined,
     renotify: !!m.tag,
