@@ -166,7 +166,12 @@
 /* Cuentas para transferir */
 .p-cuentas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .p-cuenta { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.p-cuenta-tit { margin: 0; }
+.p-cuenta-tit { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.p-cuenta-tit span { color: var(--ink-muted); font-size: 14.5px; }
 .p-cuenta .p-datos { grid-template-columns: 1fr; }
 .p-cvu { font-variant-numeric: tabular-nums; letter-spacing: .02em; word-break: break-all; }
 .p-cuenta .btn { white-space: normal; text-align: center; }
+.p-comprobante { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: auto; }
+.p-comprobante-tit { margin: 0; font-weight: 700; }
+.p-comprobante .btn svg { width: 18px; height: 18px; flex: none; }
+.p-ico-wa { fill: currentColor; stroke: none; }

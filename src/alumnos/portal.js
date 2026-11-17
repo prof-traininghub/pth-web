@@ -27,7 +27,8 @@
     meet: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>',
     ok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>',
     reloj: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-    copiar: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>'
+    copiar: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+    wa: '<svg class="p-ico-wa" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.7 15l-1.3 5 5.1-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg>'
   };
 
   /* ---------- próxima clase ---------- */
@@ -279,6 +280,14 @@
       </div>`;
   }
 
+  // Caro y Marian se reconocen por su WhatsApp de Config; si no, el primer nombre del titular.
+  function apodo(k) {
+    const cfg = datos.config;
+    if (k.wa && k.wa === String(cfg.waCaro || '').replace(/\D/g, '')) return 'Caro';
+    if (k.wa && k.wa === String(cfg.waMarian || '').replace(/\D/g, '')) return 'Marian';
+    return primerNombre(k.titular);
+  }
+
   function vAbono() {
     const cuotas = datos.cuotas, a = datos.alumno, cuentas = datos.config.cuentas || [];
     const pend = cuotas.filter(c => !/pagad/i.test(c.estado));
@@ -289,12 +298,13 @@
         ${cuentas.length ? `<div class="p-pago">
           <p class="p-eyebrow p-mini">${cuentas.length > 1 ? 'Pagá por transferencia a cualquiera de estas cuentas' : 'Pagá por transferencia'}</p>
           <div class="p-cuentas">${cuentas.map(k => `<div class="p-cuenta">
-            <p class="p-cuenta-tit"><b>${esc(k.titular)}</b>${k.entidad ? ` · ${esc(k.entidad)}` : ''}</p>
+            <p class="p-cuenta-tit"><b>${esc(k.titular)}</b>${k.entidad ? `<span>${esc(k.entidad)}</span>` : ''}</p>
             <dl class="p-datos p-datos-claro">
               ${k.alias ? `<div><dt>Alias</dt><dd><span>${esc(k.alias)}</span> <button class="p-copiar" type="button" data-copiar="${esc(k.alias)}">${ICONOS.copiar}Copiar</button></dd></div>` : ''}
               ${k.cvu ? `<div><dt>CVU</dt><dd><span class="p-cvu">${esc(k.cvu)}</span> <button class="p-copiar" type="button" data-copiar="${esc(k.cvu)}">${ICONOS.copiar}Copiar</button></dd></div>` : ''}
             </dl>
-            ${k.wa ? `<a class="btn btn-sec" ${ext} href="${wa(k.wa, 'Hola, te mando el comprobante de la cuota de ' + c.mes + ' de ' + a.nombre + '.')}">Ya transferí: mandar el comprobante${cuentas.length > 1 ? ' a ' + esc(primerNombre(k.titular)) : ''}</a>` : ''}
+            ${k.wa ? `<div class="p-comprobante"><p class="p-comprobante-tit">¿Ya transferiste?</p>
+              <a class="btn btn-sec" ${ext} href="${wa(k.wa, 'Hola, te mando el comprobante de la cuota de ' + c.mes + ' de ' + a.nombre + '.')}">${ICONOS.wa}Enviale el comprobante a ${esc(apodo(k))}</a></div>` : ''}
           </div>`).join('')}</div>
           <p class="p-chico">La marcamos como pagada cuando la confirmamos.</p>
         </div>` : '<p class="p-muted">Consultá con PTH cómo pagar.</p>'}
