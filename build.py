@@ -1038,7 +1038,8 @@ def main():
         with open(os.path.join(OUT, "_headers"), "w") as fh:
             fh.write("/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: SAMEORIGIN\n"
                      "/assets/*\n  Cache-Control: public, max-age=86400\n"
-                     "/alumnos/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-cache\n")
+                     "/alumnos/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-cache\n"
+                     "/*.webmanifest\n  Content-Type: application/manifest+json\n")
         # borradores: fuera de dist, no se publican
         bdir = os.path.join(ROOT, "borradores")
         shutil.rmtree(bdir, ignore_errors=True)
