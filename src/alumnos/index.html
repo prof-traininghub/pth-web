@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="../assets/css/site.css">
 <link rel="stylesheet" href="portal.css">
-<script>window.PTH_PORTAL = { clientId: "{{CLIENT_ID}}", api: "{{SCRIPT_URL}}" };</script>
+<script>window.PTH_PORTAL = { clientId: "{{CLIENT_ID}}", api: "{{SCRIPT_URL}}", firebase: {{FIREBASE}} };</script>
 {{GA_TAG}}
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="portal.js" defer></script>
@@ -28,6 +28,7 @@
       <img src="../assets/img/pth-logo-horizontal.svg" alt="Professional Training Hub" width="123" height="48">
     </a>
     <div class="p-user" id="usuario" hidden>
+      <a class="p-campana" href="#avisos" id="campana" aria-label="Avisos"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="p-punto" id="campana-punto" hidden></span></a>
       <span class="p-avatar" id="avatar" aria-hidden="true"></span>
       <button class="p-salir" type="button" id="salir">Salir</button>
     </div>

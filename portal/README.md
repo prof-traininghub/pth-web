@@ -18,6 +18,8 @@ No hay contraseñas ni claves secretas en este repositorio: el ID de cliente y l
 | Cuotas | Una fila por cuota: mail, mes, monto, vencimiento, estado (Pendiente/Pagado), fecha y medio de pago. |
 | Programas | Una fila por módulo de cada curso y nivel: temas, bibliografía (una línea por material, `Texto \| link`), tareas, práctica, examen. |
 | Niveles | Una fila por curso y nivel con el total de módulos. Es la base de la barra «Avance del nivel»; si falta, se usa la cantidad de módulos cargados en Programas. |
+| Avisos | Notificaciones manuales: fecha y hora (vacía = en los próximos 5 minutos), Para («Todos», un curso, «Curso · Nivel», un nivel o mails), título, mensaje y link opcional. «Estado» lo completa el sistema. |
+| Suscripciones | La completa el portal: un dispositivo por fila con sus preferencias. No hace falta tocarla. |
 | Docentes | Un nombre por fila. Es la lista del desplegable «Docente» del formulario. |
 | Devoluciones | La llena el formulario de las docentes (Devolución para el alumno · PTH). |
 | Opiniones | La llena el portal cuando un alumno envía su opinión. |
@@ -26,3 +28,14 @@ No hay contraseñas ni claves secretas en este repositorio: el ID de cliente y l
 ## Cambios en el script
 
 Editar `portal/apps-script/Codigo.gs`, pegarlo en el proyecto de Apps Script «Portal del alumno PTH» (script.google.com, cuenta de PTH) y publicar una **nueva versión** de la implementación existente (así no cambia la dirección).
+
+## Avisos al celular
+
+- Se mandan con Firebase Cloud Messaging (proyecto `portal-alumno-pth`, cuenta de PTH). La configuración pública de la app web está en `PORTAL_FIREBASE` de `build.py`.
+- El activador `enviarAvisos` corre cada 5 minutos: avisos manuales de la pestaña Avisos, «tu clase empieza en N minutos» (entre 5 y 14 minutos antes) y cuota vencida pendiente (a las 10, y cada 7 días mientras siga pendiente).
+- En iPhone solo llegan si el alumno agregó el portal a la pantalla de inicio desde Safari.
+
+## Velocidad
+
+- El portal guarda una sesión propia de 30 días (firmada por el script) y los últimos datos en el dispositivo: abre al instante y actualiza en segundo plano.
+- El script guarda en caché los datos de cada alumno 10 minutos; cualquier cambio en la planilla o una devolución nueva la invalida.

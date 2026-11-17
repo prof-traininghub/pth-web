@@ -14,7 +14,8 @@
 
 const ZONA = 'America/Argentina/Buenos_Aires';
 const PLANILLA_ID = '1mwn40Wy51VBr_okTq6Ep3iRctiQs1rv8OHONMGg2Lxc';
-function planilla() { return SpreadsheetApp.openById(PLANILLA_ID); }
+let _planilla = null;
+function planilla() { return _planilla || (_planilla = SpreadsheetApp.openById(PLANILLA_ID)); }
 
 const HOJAS = {
   alumnos: ['Mail de Google', 'Nombre', 'Curso', 'Nivel', 'Módulo actual', 'Día', 'Hora inicio', 'Hora fin',
@@ -25,11 +26,13 @@ const HOJAS = {
   opiniones: ['Fecha', 'Mail de Google', 'Nombre', 'Curso', 'Nota', 'Tema', 'Lo que más sirve', 'Qué cambiaría'],
   config: ['Clave', 'Valor'],
   docentes: ['Docente'],
-  niveles: ['Curso', 'Nivel', 'Total de módulos']
+  niveles: ['Curso', 'Nivel', 'Total de módulos'],
+  suscripciones: ['Mail de Google', 'Nombre', 'Token', 'Clase', 'Cuota', 'Novedades', 'Dispositivo', 'Actualizado'],
+  avisos: ['Fecha y hora', 'Para', 'Título', 'Mensaje', 'Link', 'Estado']
 };
 const NOMBRES = { alumnos: 'Alumnos', cuotas: 'Cuotas', programas: 'Programas', opiniones: 'Opiniones',
                   config: 'Config', docentes: 'Docentes', niveles: 'Niveles',
-                  devoluciones: 'Devoluciones' };
+                  suscripciones: 'Suscripciones', avisos: 'Avisos', devoluciones: 'Devoluciones' };
 const CONFIG_INICIAL = [
   ['Cuenta 1 · Titular', ''], ['Cuenta 1 · Entidad', ''], ['Cuenta 1 · Alias', ''], ['Cuenta 1 · CVU', ''], ['Cuenta 1 · WhatsApp', ''],
   ['Cuenta 2 · Titular', ''], ['Cuenta 2 · Entidad', ''], ['Cuenta 2 · Alias', ''], ['Cuenta 2 · CVU', ''], ['Cuenta 2 · WhatsApp', ''],
@@ -47,14 +50,37 @@ function doPost(e) {
   let pedido;
   try { pedido = JSON.parse(e.postData.contents); } catch (err) { return json({ error: 'pedido' }); }
 
-  const usuario = verificarToken(pedido.token);
+  // Sesión propia (30 días) para no validar con Google en cada pedido; si no hay, se valida el ingreso con Google.
+  let usuario = leerSesion(pedido.sesion), sesion = null;
+  if (!usuario && pedido.token) {
+    usuario = verificarToken(pedido.token);
+    if (usuario) sesion = crearSesion(usuario);
+  }
   if (!usuario) return json({ error: 'sesion' });
+
+  const cache = CacheService.getScriptCache();
+  const claveCache = 'datos:' + versionDatos() + ':' + usuario.email;
+  if (pedido.accion === 'datos') {
+    const guardado = cache.get(claveCache);
+    if (guardado) {
+      const r = JSON.parse(guardado);
+      if (sesion) r.sesion = sesion;
+      return json(r);
+    }
+  }
 
   const alumno = buscarAlumno(usuario.email);
   if (!alumno) return json({ error: 'no-alumno', email: usuario.email });
 
-  if (pedido.accion === 'datos') return json(datosDelAlumno(alumno, usuario));
+  if (pedido.accion === 'datos') {
+    const r = datosDelAlumno(alumno, usuario);
+    try { cache.put(claveCache, JSON.stringify(r), 600); } catch (e) { /* demasiado grande: sin caché */ }
+    if (sesion) r.sesion = sesion;
+    return json(r);
+  }
   if (pedido.accion === 'opinion') return json(guardarOpinion(alumno, pedido.opinion || {}));
+  if (pedido.accion === 'avisos') { cache.remove(claveCache); return json(guardarSuscripcion(alumno, pedido)); }
+  if (pedido.accion === 'avisos-baja') { cache.remove(claveCache); return json(borrarSuscripcion(usuario.email, pedido.fcm)); }
   return json({ error: 'accion' });
 }
 
@@ -76,20 +102,57 @@ function verificarToken(token) {
   return { email: String(d.email).toLowerCase().trim(), nombre: d.name || '', foto: d.picture || '' };
 }
 
+/* ---------------- Sesión propia y caché ---------------- */
+
+// Firma HMAC con un secreto que solo conoce el script: el alumno no tiene que validar con Google en cada visita.
+function secretoSesion() {
+  const p = PropertiesService.getScriptProperties();
+  let s = p.getProperty('SESION_SECRETO');
+  if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); p.setProperty('SESION_SECRETO', s); }
+  return s;
+}
+function b64(bytes) { return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, ''); }
+function firmar(txt) { return b64(Utilities.computeHmacSha256Signature(txt, secretoSesion())); }
+
+function crearSesion(u) {
+  const cuerpo = b64(Utilities.newBlob(JSON.stringify({
+    e: u.email, n: u.nombre, f: u.foto, x: Date.now() + 30 * 24 * 3600 * 1000
+  })).getBytes());
+  return cuerpo + '.' + firmar(cuerpo);
+}
+
+function leerSesion(s) {
+  if (!s || typeof s !== 'string') return null;
+  const partes = s.split('.');
+  if (partes.length !== 2 || firmar(partes[0]) !== partes[1]) return null;
+  try {
+    const c = partes[0] + '==='.slice((partes[0].length + 3) % 4);
+    const d = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(c)).getDataAsString());
+    if (!d.e || d.x < Date.now()) return null;
+    return { email: d.e, nombre: d.n || '', foto: d.f || '' };
+  } catch (e) { return null; }
+}
+
+// Cada cambio en la planilla invalida la caché de datos de todos los alumnos.
+function versionDatos() { return PropertiesService.getScriptProperties().getProperty('VERSION_DATOS') || '0'; }
+function datosCambiaron() { PropertiesService.getScriptProperties().setProperty('VERSION_DATOS', String(Date.now())); }
+
 /* ---------------- Lectura de la planilla ---------------- */
 
 function hoja(clave) {
   return planilla().getSheetByName(NOMBRES[clave]);
 }
 
+const _filas = {};
 function filas(clave) {
+  if (_filas[clave]) return _filas[clave];
   const h = hoja(clave);
-  if (!h || h.getLastRow() < 2) return [];
+  if (!h || h.getLastRow() < 2) return (_filas[clave] = []);
   const valores = h.getDataRange().getValues();
   const encabezados = valores.shift().map(String);
-  return valores
+  return (_filas[clave] = valores
     .filter(f => f.some(c => c !== '' && c !== null))
-    .map(f => Object.fromEntries(encabezados.map((e, i) => [e, f[i]])));
+    .map(f => Object.fromEntries(encabezados.map((e, i) => [e, f[i]]))));
 }
 
 function texto(v) {
@@ -215,6 +278,7 @@ function datosDelAlumno(a, usuario) {
     },
     programa: programa,
     avance: avance,
+    avisos: preferenciasDeAvisos(email),
     cuotas: cuotas,
     devoluciones: devoluciones,
     config: {
@@ -247,6 +311,207 @@ function guardarOpinion(a, o) {
     limpiar(o.cambiaria)
   ]);
   return { ok: true };
+}
+
+/* ---------------- Avisos (notificaciones al celular) ---------------- */
+
+const PROYECTO_FIREBASE = 'portal-alumno-pth';
+const URL_PORTAL = 'https://proftraininghub.com.ar/alumnos/';
+const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+const sinTildes = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+const siNo = v => (v === false || v === 'No') ? 'No' : 'Sí';
+
+function preferenciasDeAvisos(email) {
+  const mias = filas('suscripciones').filter(f => texto(f['Mail de Google']).toLowerCase() === email);
+  const f = mias[mias.length - 1];
+  return {
+    dispositivos: mias.length,
+    clase: !f || texto(f['Clase']) !== 'No',
+    cuota: !f || texto(f['Cuota']) !== 'No',
+    novedades: !f || texto(f['Novedades']) !== 'No'
+  };
+}
+
+// Alta o actualización de un dispositivo; las preferencias valen para todos los dispositivos del alumno.
+function guardarSuscripcion(a, p) {
+  const fcm = String(p.fcm || '').trim();
+  if (!fcm || fcm.length > 4096) return { error: 'token' };
+  const email = texto(a['Mail de Google']).toLowerCase();
+  const pref = p.preferencias || {};
+  const h = hoja('suscripciones');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const valores = h.getDataRange().getValues();
+    for (let r = valores.length - 1; r >= 1; r--) {
+      const tok = String(valores[r][2]);
+      if (tok === fcm || (p.anterior && tok === p.anterior)) h.deleteRow(r + 1);
+    }
+    h.appendRow([email, texto(a['Nombre']), fcm, siNo(pref.clase), siNo(pref.cuota), siNo(pref.novedades),
+                 String(p.dispositivo || '').slice(0, 80), new Date()]);
+    const todas = h.getDataRange().getValues();
+    for (let r = 1; r < todas.length; r++) {
+      if (String(todas[r][0]).toLowerCase() === email) {
+        h.getRange(r + 1, 4, 1, 3).setValues([[siNo(pref.clase), siNo(pref.cuota), siNo(pref.novedades)]]);
+      }
+    }
+  } finally { lock.releaseLock(); }
+  return { ok: true };
+}
+
+function borrarSuscripcion(email, fcm) {
+  if (!fcm) return { ok: true };
+  borrarTokens([String(fcm)]);
+  return { ok: true };
+}
+
+function borrarTokens(tokens) {
+  const h = hoja('suscripciones');
+  const valores = h.getDataRange().getValues();
+  for (let r = valores.length - 1; r >= 1; r--) {
+    if (tokens.indexOf(String(valores[r][2])) >= 0) h.deleteRow(r + 1);
+  }
+}
+
+// Manda un aviso a una lista de dispositivos por Firebase Cloud Messaging. Devuelve cuántos llegaron.
+function enviarPush(tokens, aviso, ttl) {
+  tokens = tokens.filter((t, i) => t && tokens.indexOf(t) === i);
+  if (!tokens.length) return 0;
+  const url = 'https://fcm.googleapis.com/v1/projects/' + PROYECTO_FIREBASE + '/messages:send';
+  const auth = 'Bearer ' + ScriptApp.getOAuthToken();
+  const pedidos = tokens.map(t => ({
+    url: url, method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { Authorization: auth },
+    payload: JSON.stringify({ message: {
+      token: t,
+      data: { title: aviso.titulo, body: aviso.cuerpo || '', link: aviso.link || URL_PORTAL, tag: aviso.tag || '' },
+      webpush: { headers: { TTL: String(ttl || 86400), Urgency: 'high' } }
+    } })
+  }));
+  const vencidos = [];
+  let ok = 0;
+  UrlFetchApp.fetchAll(pedidos).forEach((r, i) => {
+    const codigo = r.getResponseCode();
+    if (codigo === 200) { ok++; return; }
+    const cuerpo = r.getContentText();
+    if (codigo === 404 || /UNREGISTERED|NOT_FOUND/.test(cuerpo)) vencidos.push(tokens[i]);
+    else console.warn('FCM ' + codigo + ': ' + cuerpo.slice(0, 300));
+  });
+  if (vencidos.length) borrarTokens(vencidos);
+  return ok;
+}
+
+// Lo dispara un activador cada 5 minutos.
+function enviarAvisos() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(2000)) return;
+  try {
+    const subs = filas('suscripciones');
+    if (!subs.length) return;
+    const activos = filas('alumnos').filter(a => texto(a['Mail de Google']) && !/^no$/i.test(texto(a['Activo'])));
+    avisosManuales(subs, activos);
+    avisosDeClase(subs, activos);
+    avisosDeCuota(subs, activos);
+  } finally { lock.releaseLock(); }
+}
+
+function tokensDe(subs, emails, tipo) {
+  return subs.filter(s => emails.indexOf(texto(s['Mail de Google']).toLowerCase()) >= 0 && texto(s[tipo]) !== 'No')
+             .map(s => texto(s['Token']));
+}
+
+// Pestaña Avisos: una fila por aviso. Si «Fecha y hora» está vacía, sale en el próximo ciclo.
+function avisosManuales(subs, activos) {
+  const h = hoja('avisos');
+  if (!h || h.getLastRow() < 2) return;
+  const valores = h.getRange(2, 1, h.getLastRow() - 1, 6).getValues();
+  const ahora = new Date();
+  valores.forEach((f, i) => {
+    const [cuando, para, titulo, mensaje, link, estado] = f;
+    if (!texto(titulo) || texto(estado)) return;
+    if (cuando instanceof Date && cuando > ahora) return;
+    const emails = destinatarios(texto(para), activos);
+    const n = enviarPush(tokensDe(subs, emails, 'Novedades'),
+      { titulo: texto(titulo), cuerpo: texto(mensaje), link: texto(link), tag: 'aviso-' + (i + 2) });
+    h.getRange(i + 2, 6).setValue(n ? 'Enviado el ' + Utilities.formatDate(ahora, ZONA, 'dd/MM HH:mm') + ' a ' + n + ' dispositivo' + (n === 1 ? '' : 's')
+                                     : 'Sin destinatarios con avisos activados');
+  });
+}
+
+// «Todos» (o vacío), un curso, «Curso · Nivel», un nivel o mails; varios separados por coma.
+function destinatarios(para, activos) {
+  const mail = a => texto(a['Mail de Google']).toLowerCase();
+  if (!para || /^todos$/i.test(para)) return activos.map(mail);
+  const partes = para.split(/[,;\n]+/).map(p => p.trim()).filter(Boolean);
+  return activos.filter(a => partes.some(p => {
+    const q = sinTildes(p), curso = sinTildes(texto(a['Curso'])), nivel = sinTildes(texto(a['Nivel']));
+    if (p.indexOf('@') > 0) return q === mail(a);
+    if (q.indexOf('·') > 0) { const [c, n] = q.split('·').map(x => x.trim()); return c === curso && n === nivel; }
+    return q === curso || q === nivel;
+  })).map(mail);
+}
+
+// «Tu clase empieza en N minutos», entre 5 y 14 minutos antes (una vez por clase).
+function avisosDeClase(subs, activos) {
+  const ahora = new Date();
+  const hoy = DIAS_SEMANA[Number(Utilities.formatDate(ahora, ZONA, 'u')) % 7];
+  const fecha = Utilities.formatDate(ahora, ZONA, 'yyyyMMdd');
+  const minutosAhora = Number(Utilities.formatDate(ahora, ZONA, 'H')) * 60 + Number(Utilities.formatDate(ahora, ZONA, 'm'));
+  const cache = CacheService.getScriptCache();
+  activos.forEach(a => {
+    if (sinTildes(texto(a['Día'])) !== hoy) return;
+    const ini = hora(a['Hora inicio']).split(':').map(Number);
+    if (ini.length < 2 || isNaN(ini[0])) return;
+    const faltan = ini[0] * 60 + ini[1] - minutosAhora;
+    if (faltan <= 4 || faltan > 14) return;
+    const email = texto(a['Mail de Google']).toLowerCase();
+    const clave = 'clase:' + email + ':' + fecha;
+    if (cache.get(clave)) return;
+    cache.put(clave, '1', 21600);
+    const meet = texto(a['Link de Meet']);
+    enviarPush(tokensDe(subs, [email], 'Clase'), {
+      titulo: 'Tu clase empieza en ' + faltan + ' minutos',
+      cuerpo: 'Hoy de ' + hora(a['Hora inicio']) + (hora(a['Hora fin']) ? ' a ' + hora(a['Hora fin']) : '') + ' h. ' +
+              (meet ? 'Tocá para entrar a Meet.' : 'Te esperamos.'),
+      link: /^https?:/.test(meet) ? meet : URL_PORTAL + '#inicio', tag: 'clase'
+    }, 900);
+  });
+}
+
+// Cuota vencida y pendiente: un aviso a las 10 h, y se repite cada 7 días mientras siga pendiente.
+function avisosDeCuota(subs, activos) {
+  const ahora = new Date();
+  if (Number(Utilities.formatDate(ahora, ZONA, 'H')) < 10) return;
+  const props = PropertiesService.getScriptProperties();
+  const hoy = Utilities.formatDate(ahora, ZONA, 'yyyy-MM-dd');
+  if (props.getProperty('AVISOS_CUOTA_DIA') === hoy) return;
+  props.setProperty('AVISOS_CUOTA_DIA', hoy);
+  const enviados = JSON.parse(props.getProperty('AVISOS_CUOTA') || '{}');
+  const vigentes = {};
+  const emailsActivos = activos.map(a => texto(a['Mail de Google']).toLowerCase());
+  filas('cuotas').forEach(c => {
+    const email = texto(c['Mail de Google']).toLowerCase();
+    if (/pagad/i.test(texto(c['Estado'])) || emailsActivos.indexOf(email) < 0) return;
+    const vence = fechaDe(c['Vence']);
+    if (!vence || Utilities.formatDate(vence, ZONA, 'yyyy-MM-dd') >= hoy) return;
+    const clave = email + '|' + mes(c['Mes']);
+    const ultimo = enviados[clave];
+    vigentes[clave] = ultimo;
+    if (ultimo && (ahora - new Date(ultimo + 'T12:00:00')) < 6.5 * 24 * 3600 * 1000) return;
+    const n = enviarPush(tokensDe(subs, [email], 'Cuota'), {
+      titulo: 'Tu cuota de ' + mes(c['Mes']) + ' está pendiente',
+      cuerpo: 'Venció el ' + texto(c['Vence']) + '. En el portal tenés los datos para transferir.',
+      link: URL_PORTAL + '#abono', tag: 'cuota'
+    });
+    if (n) vigentes[clave] = hoy;
+  });
+  props.setProperty('AVISOS_CUOTA', JSON.stringify(vigentes));
+}
+
+function fechaDe(v) {
+  if (v instanceof Date) return v;
+  const m = texto(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12) : null;
 }
 
 /* ---------------- Puesta en marcha (se corren una vez desde el editor) ---------------- */
@@ -304,6 +569,7 @@ function crearFormularioDevoluciones() {
 }
 
 function actualizarFormulario() {
+  datosCambiaron();
   const id = PropertiesService.getScriptProperties().getProperty('FORM_ID');
   if (!id) return;
   const form = FormApp.openById(id);
@@ -394,4 +660,33 @@ function cuentasEnConfig() {
   h.insertRowsAfter(1, filasNuevas.length);
   h.getRange(2, 2, filasNuevas.length, 1).setNumberFormat('@');
   h.getRange(2, 1, filasNuevas.length, 2).setValues(filasNuevas);
+}
+
+// Se corrió una vez (17/11/2026): pestañas Suscripciones y Avisos, activador de avisos cada 5 minutos
+// y activadores que invalidan la caché cuando cambia la planilla o llega una devolución.
+function activarAvisos() {
+  const ss = planilla();
+  ['suscripciones', 'avisos'].forEach(k => {
+    if (ss.getSheetByName(NOMBRES[k])) return;
+    const h = ss.insertSheet(NOMBRES[k]);
+    h.getRange(1, 1, 1, HOJAS[k].length).setValues([HOJAS[k]])
+      .setFontWeight('bold').setBackground('#1d231f').setFontColor('#ffffff');
+    h.setFrozenRows(1);
+  });
+  const av = hoja('avisos');
+  av.getRange('A2:A').setNumberFormat('dd/MM/yyyy HH:mm');
+  av.setColumnWidth(1, 140); av.setColumnWidth(2, 200); av.setColumnWidth(3, 220); av.setColumnWidth(4, 360);
+  av.getRange('A1').setNote('Vacía = se envía en los próximos 5 minutos.');
+  av.getRange('B1').setNote('«Todos», un curso (General English), «Curso · Nivel», un nivel o mails, separados por coma.');
+  av.getRange('F1').setNote('Lo completa el sistema al enviar. Para reenviar un aviso, borrá esta celda.');
+  hoja('suscripciones').getRange('A1').setNote('La completa el portal cuando un alumno activa los avisos. No hace falta tocarla.');
+
+  const existentes = ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction());
+  if (existentes.indexOf('enviarAvisos') < 0) ScriptApp.newTrigger('enviarAvisos').timeBased().everyMinutes(5).create();
+  if (existentes.indexOf('datosCambiaron') < 0) {
+    const formId = PropertiesService.getScriptProperties().getProperty('FORM_ID');
+    if (formId) ScriptApp.newTrigger('datosCambiaron').forForm(formId).onFormSubmit().create();
+  }
+  secretoSesion();
+  datosCambiaron();
 }

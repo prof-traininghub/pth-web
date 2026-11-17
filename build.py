@@ -49,6 +49,14 @@ def rel(pagina, destino):
 # Portal del alumno (/alumnos/): se completan al configurar Google (ver portal/README.md)
 PORTAL_CLIENT_ID = "906483008838-58edmj4eoipmajce5tr67l3bmk9bb2oi.apps.googleusercontent.com"
 PORTAL_API = "https://script.google.com/macros/s/AKfycbxDjpS8oleWc38A0lcyJGz3q8BFD_IWyho9p6cVIW5BuSsiN4RDwdn74MrYqmbaloa6eQ/exec"
+# Avisos al celular (Firebase Cloud Messaging, proyecto portal-alumno-pth). Son datos públicos de la app web.
+PORTAL_FIREBASE = {
+    "apiKey": "AIzaSyAHsllyFpBUZt4hlN-qEPcZ4hXaqfVHBQE",
+    "projectId": "portal-alumno-pth",
+    "messagingSenderId": "906483008838",
+    "appId": "1:906483008838:web:4fff78ec54058dc1df9147",
+    "vapidKey": "BMdNvO-UGTsDHNnOI81wTCRkMzZ62Dz6eplPfrFxl7A8fRajXiyYVSndLf_pU_mrA42yw2Im0blgPiqgGL8Yq3E",
+}
 GA_ID = "G-L41KL5314T"
 GA_TAG = f'''<script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){{dataLayer.push(arguments);}}gtag('js',new Date());gtag('config','{GA_ID}');</script>'''
@@ -824,7 +832,7 @@ def c_privacidad(p):
     secciones = [
         ("Quién es responsable de tus datos", f"Professional Training Hub, a cargo de Mariana Bianchi y Carolina Capello. Contacto: {MAIL_LINK}."),
         ("Qué datos recolectamos", "Los que completás en los formularios: nombre, email, teléfono, empresa y el mensaje que nos escribís. También datos de navegación anónimos a través de Google Analytics."),
-        ("Portal del alumno", "Si sos alumno o alumna, podés ingresar al portal con tu cuenta de Google. Google solo nos comparte tu nombre, tu email y tu foto de perfil, y los usamos para identificarte y mostrarte tu cursada, tu material, el estado de tu abono y las devoluciones de tus docentes. Esos datos, junto con las opiniones que nos dejes, se guardan en una planilla de Google de la cuenta de PTH, a la que solo acceden las directoras. No guardamos contraseñas ni accedemos a ningún otro dato de tu cuenta de Google."),
+        ("Portal del alumno", "Si sos alumno o alumna, podés ingresar al portal con tu cuenta de Google. Google solo nos comparte tu nombre, tu email y tu foto de perfil, y los usamos para identificarte y mostrarte tu cursada, tu material, el estado de tu abono y las devoluciones de tus docentes. Esos datos, junto con las opiniones que nos dejes, se guardan en una planilla de Google de la cuenta de PTH, a la que solo acceden las directoras. No guardamos contraseñas ni accedemos a ningún otro dato de tu cuenta de Google. Si activás los avisos, guardamos un identificador de tu dispositivo (no tu número) para mandarte las notificaciones que elegiste; podés desactivarlos cuando quieras desde la sección Avisos del portal."),
         ("Para qué los usamos", "Solo para responder tus consultas, enviarte la información que pediste y coordinar tus clases. No los vendemos ni los cedemos a terceros para publicidad."),
         ("Dónde se guardan", "El sitio y los formularios funcionan en Netlify, los datos del portal del alumno en Google (Hojas de cálculo y Apps Script), y las estadísticas de visitas en Google Analytics. Estos servicios procesan los datos por cuenta nuestra."),
         ("Cuánto tiempo los conservamos", "Mientras sean necesarios para atender tu consulta o mientras seas alumno o alumna de PTH."),
@@ -838,7 +846,7 @@ def c_privacidad(p):
     <p class="eyebrow">Legal</p>
     <h1 style="margin-top:var(--s3)">Política de privacidad</h1>
     {cuerpo}
-    <p class="legal" style="margin-top:var(--s5)">Última actualización: 16 de noviembre de 2026</p>
+    <p class="legal" style="margin-top:var(--s5)">Última actualización: 17 de noviembre de 2026</p>
   </div>
 </section>'''
 
@@ -977,6 +985,7 @@ def portal():
         html = fh.read()
     html = (html.replace("{{CLIENT_ID}}", PORTAL_CLIENT_ID or "{{CLIENT_ID}}")
                 .replace("{{SCRIPT_URL}}", PORTAL_API)
+                .replace("{{FIREBASE}}", json.dumps(PORTAL_FIREBASE))
                 .replace("{{GA_TAG}}", "" if PREVIEW else GA_TAG))
     with open(ruta, "w", encoding="utf-8") as fh:
         fh.write(html)
