@@ -554,13 +554,36 @@
   // Los avisos vienen activados: al primer toque en el portal el navegador pide permiso una sola vez.
   // Si ya lo había dado (otra sesión), se suscribe sin preguntar nada.
   const CLAVE_PEDIDO = 'pth-avisos-pedido';
+  const CLAVE_PEDIDO_APP = 'pth-avisos-pedido-app';
   let esperandoToque = false;
   function prepararAvisos() {
     const e = estadoAvisos();
     if (e === 'activo') { refrescarAvisos(); return; }
     if (e !== 'inactivo') return;
     if (Notification.permission === 'granted') { suscribir(preferencias()).catch(() => {}); return; }
-    if (leerL(CLAVE_PEDIDO) || esperandoToque) return;
+    if (esperandoToque) return;
+    // Con la app instalada se pide apenas abre (aunque en el navegador lo haya salteado).
+    // Si el celular exige un toque (iPhone), queda para el primer toque.
+    if (instalada && !leerL(CLAVE_PEDIDO_APP)) {
+      guardarL(CLAVE_PEDIDO_APP, '1');
+      let pedido;
+      try { pedido = Notification.requestPermission(); } catch (e) { pedido = null; }
+      if (pedido && pedido.then) {
+        pedido.then(r => {
+          if (r === 'granted') { guardarL(CLAVE_PEDIDO, '1'); return suscribir(preferencias()).then(() => { if (rutaActual() === 'avisos') mostrar(true); }); }
+          if (r === 'denied') { guardarL(CLAVE_PEDIDO, '1'); return; }
+          esperarToque(true);
+        }).catch(() => esperarToque(true));
+        return;
+      }
+      esperarToque(true);
+      return;
+    }
+    esperarToque();
+  }
+
+  function esperarToque(forzar) {
+    if (esperandoToque || (leerL(CLAVE_PEDIDO) && !forzar) || Notification.permission !== 'default') return;
     esperandoToque = true;
     const alTocar = ev => {
       if (ev.target.closest && ev.target.closest('#salir, #av-form')) return;
@@ -630,8 +653,15 @@
     const inst = document.getElementById('instalar');
     if (inst) inst.addEventListener('click', async () => {
       pedidoInstalar.prompt();
-      try { await pedidoInstalar.userChoice; } catch (e) { /* nada */ }
-      pedidoInstalar = null; mostrar(true);
+      let eleccion = null;
+      try { eleccion = await pedidoInstalar.userChoice; } catch (e) { /* nada */ }
+      pedidoInstalar = null;
+      // Recién instalada: se piden los avisos (el permiso vale también para la app).
+      if (eleccion && eleccion.outcome === 'accepted' && estadoAvisos() === 'inactivo') {
+        guardarL(CLAVE_PEDIDO, '1');
+        try { await activarAvisos(preferencias()); } catch (e) { /* se reintenta al abrir la app */ }
+      }
+      mostrar(true);
     });
     const f = document.getElementById('av-form');
     if (!f) return;
