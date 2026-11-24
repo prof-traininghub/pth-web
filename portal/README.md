@@ -45,3 +45,18 @@ Editar `portal/apps-script/Codigo.gs`, pegarlo en el proyecto de Apps Script «P
 - Recomendado: una fila por curso con el mismo mail (cada curso con su día, horario, Meet, Classroom, nivel y módulo).
 - También funciona «General English + Business English» en una misma fila: mismo horario; nivel y módulo se separan igual con «+» («Intermedio (B1) + Avanzado (B2)», «3 + 1»).
 - El portal muestra la próxima clase de cualquiera de sus cursos, una tarjeta por curso en Inicio y pestañas por curso en Programa y material.
+
+## Panel de dirección (/panel/)
+
+Panel para las directoras en https://proftraininghub.com.ar/panel/ (no se indexa). Entra solo la cuenta
+prof.traininghub@gmail.com; para sumar otra, en el proyecto de Apps Script: Configuración → Propiedades del script →
+`ADMINS` con los mails separados por coma.
+
+Muestra alumnos, cuotas, avisos, devoluciones y opiniones con la identidad de PTH, y permite acciones simples que
+escriben en la planilla: marcar una cuota pagada (o deshacer), pasar a un alumno de módulo, mandar o programar un aviso
+y editar el «Mensaje del inicio». Antes de escribir, el script confirma que la fila sigue siendo la misma (mail y mes);
+si alguien ordenó la planilla mientras tanto, el panel pide repetir la acción. Altas, bajas y cambios grandes se
+siguen haciendo en la planilla.
+
+Archivos: `src/panel/` (frontend) y la sección «Panel de PTH» de `Codigo.gs` (acciones `panel`, `panel-cuota`,
+`panel-modulo`, `panel-aviso`, `panel-mensaje`).

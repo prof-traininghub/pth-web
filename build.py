@@ -995,6 +995,18 @@ def portal():
         fh.write(html)
 
 
+def panel():
+    """Copia el panel de dirección de PTH a /panel/ y le pone la configuración."""
+    destino = os.path.join(OUT, "panel")
+    shutil.copytree(os.path.join(SRC, "panel"), destino)
+    ruta = os.path.join(destino, "index.html")
+    with open(ruta, encoding="utf-8") as fh:
+        html = fh.read()
+    html = html.replace("{{CLIENT_ID}}", PORTAL_CLIENT_ID).replace("{{SCRIPT_URL}}", PORTAL_API)
+    with open(ruta, "w", encoding="utf-8") as fh:
+        fh.write(html)
+
+
 def escribir(base, p):
     destino = os.path.join(base, p.ruta if p.ruta.endswith(".html") else p.ruta + "index.html")
     os.makedirs(os.path.dirname(destino), exist_ok=True)
@@ -1022,6 +1034,7 @@ def main():
     for p in ps:
         escribir(OUT, p)
     portal()
+    panel()
     if PREVIEW:
         for p in borradores():
             escribir(OUT, p)
@@ -1039,6 +1052,7 @@ def main():
             fh.write("/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: SAMEORIGIN\n"
                      "/assets/*\n  Cache-Control: public, max-age=86400\n"
                      "/alumnos/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-cache\n"
+                     "/panel/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-cache\n"
                      "/*.webmanifest\n  Content-Type: application/manifest+json\n")
         # borradores: fuera de dist, no se publican
         bdir = os.path.join(ROOT, "borradores")
