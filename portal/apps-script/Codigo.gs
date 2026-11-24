@@ -217,13 +217,32 @@ function bibliografia(valor) {
   });
 }
 
-function datosDelAlumno(a, usuario) {
-  const curso = texto(a['Curso']);
-  const nivel = texto(a['Nivel']);
-  const actual = Number(a['Módulo actual']) || 0;
+// Un alumno puede tener varios cursos: una fila por curso con el mismo mail (recomendado),
+// o «Curso A + Curso B» en una misma fila (mismo horario; nivel y módulo se separan igual con «+»).
+function filasDelAlumno(email) {
+  return filas('alumnos').filter(a =>
+    texto(a['Mail de Google']).toLowerCase() === email && !/^no$/i.test(texto(a['Activo'])));
+}
 
+function partes(v) { return texto(v).split(/\s*\+\s*/).map(x => x.trim()); }
+
+function cursosDeFila(a) {
+  const cursos = partes(a['Curso']).filter(Boolean);
+  if (!cursos.length) cursos.push('');
+  const niveles = partes(a['Nivel']), modulos = partes(a['Módulo actual']);
+  const elegir = (lista, i) => (lista.length === cursos.length ? lista[i] : lista[0]) || '';
+  return cursos.map((curso, i) => ({
+    curso: curso, nivel: elegir(niveles, i), moduloActual: Number(elegir(modulos, i)) || 0,
+    dia: texto(a['Día']), horaInicio: hora(a['Hora inicio']), horaFin: hora(a['Hora fin']),
+    meet: texto(a['Link de Meet']), classroom: texto(a['Link de Classroom'])
+  }));
+}
+
+// Programa y avance de un curso.
+function armarCurso(c) {
+  const actual = c.moduloActual;
   const programa = filas('programas')
-    .filter(p => texto(p['Curso']) === curso && (!texto(p['Nivel']) || texto(p['Nivel']) === nivel))
+    .filter(p => texto(p['Curso']) === c.curso && (!texto(p['Nivel']) || texto(p['Nivel']) === c.nivel))
     .map(p => {
       const n = Number(p['Módulo N°']) || 0;
       return {
@@ -239,11 +258,17 @@ function datosDelAlumno(a, usuario) {
       };
     })
     .sort((x, y) => x.n - y.n);
-
   // Avance: módulos completados sobre el total del nivel (pestaña Niveles; si no está, los módulos cargados).
-  const nivelCfg = filas('niveles').find(n => texto(n['Curso']) === curso && texto(n['Nivel']) === nivel);
+  const nivelCfg = filas('niveles').find(n => texto(n['Curso']) === c.curso && texto(n['Nivel']) === c.nivel);
   const total = Math.max(Number(nivelCfg && nivelCfg['Total de módulos']) || 0, programa.length);
   const avance = { completados: actual ? Math.max(0, Math.min(actual - 1, total)) : 0, total: total };
+  return Object.assign({}, c, { programa: programa, avance: avance });
+}
+
+function datosDelAlumno(a, usuario) {
+  const cursos = filasDelAlumno(usuario.email).reduce((t, f) => t.concat(cursosDeFila(f)), []).map(armarCurso);
+  if (!cursos.length) cursos.push(armarCurso(cursosDeFila(a)[0]));
+  const p = cursos[0];
 
   const email = usuario.email;
   const cuotas = filas('cuotas')
@@ -272,12 +297,12 @@ function datosDelAlumno(a, usuario) {
   return {
     alumno: {
       nombre: texto(a['Nombre']) || usuario.nombre, foto: usuario.foto, email: email,
-      curso: curso, nivel: nivel, moduloActual: actual,
-      dia: texto(a['Día']), horaInicio: hora(a['Hora inicio']), horaFin: hora(a['Hora fin']),
-      meet: texto(a['Link de Meet']), classroom: texto(a['Link de Classroom'])
+      curso: p.curso, nivel: p.nivel, moduloActual: p.moduloActual,
+      dia: p.dia, horaInicio: p.horaInicio, horaFin: p.horaFin, meet: p.meet, classroom: p.classroom
     },
-    programa: programa,
-    avance: avance,
+    cursos: cursos,
+    programa: p.programa,
+    avance: p.avance,
     avisos: preferenciasDeAvisos(email),
     cuotas: cuotas,
     devoluciones: devoluciones,
@@ -444,10 +469,13 @@ function destinatarios(para, activos) {
   if (!para || /^todos$/i.test(para)) return activos.map(mail);
   const partes = para.split(/[,;\n]+/).map(p => p.trim()).filter(Boolean);
   return activos.filter(a => partes.some(p => {
-    const q = sinTildes(p), curso = sinTildes(texto(a['Curso'])), nivel = sinTildes(texto(a['Nivel']));
+    const q = sinTildes(p);
     if (p.indexOf('@') > 0) return q === mail(a);
-    if (q.indexOf('·') > 0) { const [c, n] = q.split('·').map(x => x.trim()); return c === curso && n === nivel; }
-    return q === curso || q === nivel;
+    return cursosDeFila(a).some(k => {
+      const curso = sinTildes(k.curso), nivel = sinTildes(k.nivel);
+      if (q.indexOf('·') > 0) { const [c, n] = q.split('·').map(x => x.trim()); return c === curso && n === nivel; }
+      return q === curso || q === nivel;
+    });
   })).map(mail);
 }
 
@@ -465,7 +493,7 @@ function avisosDeClase(subs, activos) {
     const faltan = ini[0] * 60 + ini[1] - minutosAhora;
     if (faltan <= 4 || faltan > 14) return;
     const email = texto(a['Mail de Google']).toLowerCase();
-    const clave = 'clase:' + email + ':' + fecha;
+    const clave = 'clase:' + email + ':' + fecha + ':' + hora(a['Hora inicio']);
     if (cache.get(clave)) return;
     cache.put(clave, '1', 21600);
     const meet = texto(a['Link de Meet']);

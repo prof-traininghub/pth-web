@@ -42,9 +42,11 @@
   const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   function normalizarDia(d) { return String(d || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
-  function proximaClase(a) {
+  // Próxima clase de un curso: { inicio, texto } o null.
+  function claseInfo(a) {
     const objetivo = DIAS.map(normalizarDia).indexOf(normalizarDia(a.dia));
     if (objetivo < 0 || !a.horaInicio) return null;
+    const [hi, mi] = a.horaInicio.split(':').map(Number);
     const [hf, mf] = (a.horaFin || a.horaInicio).split(':').map(Number);
     const ahora = new Date();
     for (let i = 0; i < 8; i++) {
@@ -52,12 +54,28 @@
       if (d.getDay() !== objetivo) continue;
       const fin = new Date(d); fin.setHours(hf || 0, mf || 0, 0, 0);
       if (fin <= ahora) continue;
+      const inicio = new Date(d); inicio.setHours(hi || 0, mi || 0, 0, 0);
       const cuando = i === 0 ? 'Hoy' : i === 1 ? 'Mañana' :
         `${DIAS[d.getDay()][0].toUpperCase()}${DIAS[d.getDay()].slice(1)} ${d.getDate()} de ${MESES[d.getMonth()]}`;
-      return `${cuando}, de ${a.horaInicio} a ${a.horaFin || ''} h`.replace(' a  h', ' h');
+      return { inicio, texto: `${cuando}, de ${a.horaInicio} a ${a.horaFin || ''} h`.replace(' a  h', ' h') };
     }
     return null;
   }
+  function proximaClase(a) { const c = claseInfo(a); return c ? c.texto : null; }
+
+  // Cursos del alumno (si el script todavía no los manda, se arma uno con los datos de siempre).
+  function cursos() {
+    if (datos.cursos && datos.cursos.length) return datos.cursos;
+    return [Object.assign({}, datos.alumno, { programa: datos.programa || [], avance: datos.avance || {} })];
+  }
+  function nombreCurso(c) { return (c.curso || 'Tu curso') + (c.nivel ? ' · ' + c.nivel : ''); }
+  // El curso de la próxima clase (o el primero).
+  function cursoProximo() {
+    const cs = cursos();
+    const con = cs.map((c, i) => ({ i, p: claseInfo(c) })).filter(x => x.p).sort((x, y) => x.p.inicio - y.p.inicio);
+    return con.length ? con[0].i : 0;
+  }
+  let cursoSel = null;
 
   /* ---------- sesión ---------- */
   function tokenVigente(t) {
@@ -225,8 +243,26 @@
   }
 
   function vInicio() {
-    const a = datos.alumno, c = cuotaActual(), prox = proximaClase(a);
-    const modulo = datos.programa.find(m => m.estado === 'en curso');
+    const a = datos.alumno, c = cuotaActual(), cs = cursos(), k = cs[cursoProximo()], prox = proximaClase(k);
+    const modulo = (k.programa || []).find(m => m.estado === 'en curso');
+    const varios = cs.length > 1;
+    const tarjetasCursos = varios ? `<section class="p-sec" aria-labelledby="cursos-t">
+        <h2 id="cursos-t" class="p-h2">Tus cursos</h2>
+        <div class="p-cursos">${cs.map((x, i) => {
+          const mod = (x.programa || []).find(m => m.estado === 'en curso');
+          const horario = x.dia ? `Los ${esc(x.dia.toLowerCase())}${x.horaInicio ? ` de ${esc(x.horaInicio)}${x.horaFin ? ' a ' + esc(x.horaFin) : ''} h` : ''}` : '';
+          return `<article class="p-card p-curso">
+            <h3 class="p-h3">${esc(nombreCurso(x))}</h3>
+            ${horario || mod ? `<p class="p-muted">${[horario, mod ? `Módulo ${esc(mod.n)} · ${esc(mod.nombre)}` : ''].filter(Boolean).join('<br>')}</p>` : ''}
+            ${barraAvance(true, x)}
+            <div class="p-btns">
+              <a class="btn btn-primario" href="#material" data-curso="${i}">Ver programa</a>
+              ${url(x.meet) ? `<a class="btn btn-sec" ${ext} href="${url(x.meet)}">${ICONOS.meet}Meet</a>` : ''}
+              ${url(x.classroom) ? `<a class="btn btn-sec" ${ext} href="${url(x.classroom)}">Classroom</a>` : ''}
+            </div>
+          </article>`;
+        }).join('')}</div>
+      </section>` : '';
     return `
       <div class="p-head">
         <h1 class="p-h1">¡Hola, ${esc(primerNombre(a.nombre))}!</h1>
@@ -237,14 +273,14 @@
           <p class="p-eyebrow p-amarillo">Tu próxima clase</p>
           <h2 id="clase-t" class="p-h2">${prox ? esc(prox) : 'Consultá tu horario con PTH'}</h2>
           <dl class="p-datos">
-            ${a.curso ? `<div><dt>Programa</dt><dd>${esc(a.curso)}${a.nivel ? ' · ' + esc(a.nivel) : ''}</dd></div>` : ''}
-            ${a.dia ? `<div><dt>Cursada</dt><dd>Todos los ${esc(a.dia.toLowerCase())}</dd></div>` : ''}
+            ${k.curso ? `<div><dt>Programa</dt><dd>${esc(nombreCurso(k))}</dd></div>` : ''}
+            ${k.dia ? `<div><dt>Cursada</dt><dd>Todos los ${esc(k.dia.toLowerCase())}</dd></div>` : ''}
             ${modulo ? `<div><dt>Módulo actual</dt><dd>${esc(modulo.n)} · ${esc(modulo.nombre)}</dd></div>` : ''}
           </dl>
-          ${barraAvance()}
+          ${varios ? '' : barraAvance(false, k)}
           <div class="p-btns">
-            ${url(a.meet) ? `<a class="btn btn-acento" ${ext} href="${url(a.meet)}">${ICONOS.meet}Entrar a la clase en Meet</a>` : ''}
-            ${url(a.classroom) ? `<a class="btn btn-sec" ${ext} href="${url(a.classroom)}">Abrir Classroom</a>` : ''}
+            ${url(k.meet) ? `<a class="btn btn-acento" ${ext} href="${url(k.meet)}">${ICONOS.meet}Entrar a la clase en Meet</a>` : ''}
+            ${url(k.classroom) ? `<a class="btn btn-sec" ${ext} href="${url(k.classroom)}">Abrir Classroom</a>` : ''}
           </div>
         </section>
         <section class="p-card" aria-labelledby="abono-t">
@@ -254,23 +290,25 @@
           <a class="btn btn-primario p-full" href="#abono">${c && !/pagad/i.test(c.estado) ? 'Ver cómo pagar' : 'Ver mis pagos'}</a>
         </section>
       </div>
+      ${tarjetasCursos}
       <section class="p-sec" aria-labelledby="mat-t">
         <h2 id="mat-t" class="p-h2">Tu material</h2>
         <div class="p-accesos">
-          <a href="#material"><b>Programa</b><span>Módulos, temas, bibliografía y exámenes de tu nivel.</span></a>
-          ${url(a.classroom) ? `<a ${ext} href="${url(a.classroom)}"><b>Material extra</b><span>Tareas y práctica, en Classroom.</span></a>` : ''}
-          <a href="#progreso"><b>Tu progreso</b><span>Las devoluciones de tu profe.</span></a>
+          <a href="#material"><b>Programa</b><span>Módulos, temas, bibliografía y exámenes de ${varios ? 'tus cursos' : 'tu nivel'}.</span></a>
+          ${url(k.classroom) ? `<a ${ext} href="${url(k.classroom)}"><b>Material extra</b><span>Tareas y práctica, en Classroom.</span></a>` : ''}
+          <a href="#progreso"><b>Tu progreso</b><span>Las devoluciones de tus profes.</span></a>
         </div>
       </section>
       ${pieContacto()}`;
   }
 
   // Avance del nivel: un segmento por módulo (completados, el actual y los que faltan).
-  function barraAvance(claro) {
-    const av = datos.avance || {};
+  function barraAvance(claro, c) {
+    c = c || cursos()[0];
+    const av = c.avance || {};
     const total = Number(av.total) || 0, hechos = Math.min(Number(av.completados) || 0, total);
     if (!total) return '';
-    const actual = datos.alumno.moduloActual;
+    const actual = c.moduloActual;
     const seg = Array.from({ length: total }, (_, i) =>
       `<span class="${i < hechos ? 'on' : i + 1 === actual ? 'act' : ''}"></span>`).join('');
     const pct = Math.round(hechos / total * 100);
@@ -290,7 +328,11 @@
   }
 
   function vMaterial() {
-    const a = datos.alumno, p = datos.programa;
+    const cs = cursos();
+    if (cursoSel === null || !cs[cursoSel]) cursoSel = cursoProximo();
+    const a = cs[cursoSel], p = a.programa || [];
+    const pestanas = cs.length > 1 ? `<div class="p-tabs" role="tablist" aria-label="Tus cursos">${cs.map((x, i) =>
+      `<button type="button" role="tab" class="p-tab" data-sel="${i}" aria-selected="${i === cursoSel}">${esc(nombreCurso(x))}</button>`).join('')}</div>` : '';
     const modulos = p.length ? p.map(m => {
       const abierto = m.estado === 'en curso' || (!a.moduloActual && m === p[0]);
       const etiqueta = m.estado === 'completado' ? `<span class="p-estado">${ICONOS.ok}Completado</span>`
@@ -309,8 +351,9 @@
 
     const examenes = p.filter(m => m.examenFecha || m.examenLink);
     return `
-      <div class="p-head"><p class="p-eyebrow">${esc(a.curso)}${a.nivel ? ' · ' + esc(a.nivel) : ''}</p><h1 class="p-h1">Programa y material</h1></div>
-      <div class="p-card p-sec-sm">${barraAvance(true)}</div>
+      <div class="p-head"><p class="p-eyebrow">${esc(nombreCurso(a))}</p><h1 class="p-h1">Programa y material</h1></div>
+      ${pestanas}
+      ${barraAvance(true, a) ? `<div class="p-card p-sec-sm">${barraAvance(true, a)}</div>` : ''}
       <div class="p-grid p-grid-3">
         <section class="p-span2" aria-labelledby="prog-t"><h2 id="prog-t" class="p-h3 p-tit">Programa y bibliografía por módulo</h2>${modulos}</section>
         <div class="p-col">
@@ -374,7 +417,7 @@
 
   function vProgreso() {
     const d = datos.devoluciones;
-    if (!d.length) return `<div class="p-head"><p class="p-eyebrow">${esc(datos.alumno.curso)}</p><h1 class="p-h1">Tu progreso</h1></div>
+    if (!d.length) return `<div class="p-head"><p class="p-eyebrow">${esc(cursos().map(x => x.curso).filter(Boolean).join(' + '))}</p><h1 class="p-h1">Tu progreso</h1></div>
       <section class="p-card"><p class="p-muted">Cada tanto, tu profe te deja una devolución con lo que ya lográs y en qué seguir trabajando. Cuando esté lista, la vas a ver acá.</p></section>`;
     const sel = Math.min(Number(leer('pth-dev') || 0), d.length - 1);
     const u = d[sel];
@@ -384,7 +427,7 @@
         <div class="p-barra" role="img" aria-label="${n} de 4">${[1, 2, 3, 4].map(i => `<span${i <= n ? ' class="on"' : ''}></span>`).join('')}</div></div>`;
     }).join('');
     const lista = t => `<ul class="p-puntos">${lineas(t).map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
-    return `<div class="p-head"><p class="p-eyebrow">${esc(datos.alumno.curso)}</p><h1 class="p-h1">Tu progreso</h1>
+    return `<div class="p-head"><p class="p-eyebrow">${esc(cursos().map(x => x.curso).filter(Boolean).join(' + '))}</p><h1 class="p-h1">Tu progreso</h1>
         <p class="p-lead">Cada tanto, tu profe te deja una devolución: lo que ya lográs y en qué seguir trabajando.</p></div>
       <div class="p-grid p-grid-3">
         <section class="p-card p-span2" aria-labelledby="dev-t">
@@ -431,6 +474,8 @@
 
   /* ---------- interacción ---------- */
   function enlazar(r) {
+    vista.querySelectorAll('[data-curso]').forEach(el => el.addEventListener('click', () => { cursoSel = Number(el.dataset.curso); }));
+    vista.querySelectorAll('[data-sel]').forEach(el => el.addEventListener('click', () => { cursoSel = Number(el.dataset.sel); mostrar(true); }));
     if (r === 'avisos') enlazarAvisos();
     vista.querySelectorAll('[data-copiar]').forEach(b => b.addEventListener('click', () => {
       const t = b.dataset.copiar;

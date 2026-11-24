@@ -39,3 +39,9 @@ Editar `portal/apps-script/Codigo.gs`, pegarlo en el proyecto de Apps Script «P
 
 - El portal guarda una sesión propia de 30 días (firmada por el script) y los últimos datos en el dispositivo: abre al instante y actualiza en segundo plano.
 - El script guarda en caché los datos de cada alumno 10 minutos; cualquier cambio en la planilla o una devolución nueva la invalida.
+
+## Alumnos con más de un curso
+
+- Recomendado: una fila por curso con el mismo mail (cada curso con su día, horario, Meet, Classroom, nivel y módulo).
+- También funciona «General English + Business English» en una misma fila: mismo horario; nivel y módulo se separan igual con «+» («Intermedio (B1) + Avanzado (B2)», «3 + 1»).
+- El portal muestra la próxima clase de cualquiera de sus cursos, una tarjeta por curso en Inicio y pestañas por curso en Programa y material.

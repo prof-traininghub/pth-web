@@ -189,3 +189,14 @@
 .p-pasos { margin: 8px 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) { .p-llave i, .p-llave i::after { transition: none; } }
 .p-link-chico { background: none; border: 0; padding: 4px 0; min-height: 44px; font: inherit; font-size: 14px; color: var(--ink-muted); text-decoration: underline; cursor: pointer; }
+
+/* Varios cursos */
+.p-cursos { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.p-curso { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.p-curso .p-h3, .p-curso .p-muted { margin: 0; }
+.p-curso .p-btns { margin-top: auto; }
+.p-curso .btn svg { width: 18px; height: 18px; }
+.p-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.p-tab { font: inherit; font-weight: 600; min-height: 44px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.p-tab[aria-selected="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.p-tab:focus-visible { outline: 3px solid var(--amarillo); outline-offset: 2px; }
