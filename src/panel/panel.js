@@ -832,7 +832,7 @@
       const antes = pendientesModulo[k].antes;
       delete pendientesModulo[k];
       if (antes === valor) return;
-      accion('panel-modulo', { fila, indice, email, valor }, null,
+      accion('panel-modulo', { fila, indice, email, valor, marca: Date.now() }, null,
         valor ? 'Módulo ' + etiquetaModulo(c, valor) + ' guardado.' : 'Quedó sin módulo.',
         () => cambiarModulo(fila, indice, email, antes));
     }, 700);

@@ -838,6 +838,11 @@ function panelCuota(p) {
 function panelModulo(p) {
   const fila = filaConfirmada('alumnos', p.fila, p.email);
   if (!fila) return { error: 'cambio' };
+  // Si llegan varios cambios del mismo alumno, gana el último que se tocó en el panel (aunque llegue antes).
+  const marca = Number(p.marca) || Date.now();
+  const cache = CacheService.getScriptCache(), claveMarca = 'modulo:' + fila + ':' + (Number(p.indice) || 0);
+  if (Number(cache.get(claveMarca) || 0) > marca) return null;
+  cache.put(claveMarca, String(marca), 21600);
   const valor = Math.max(0, Math.min(99, Math.round(Number(p.valor) || 0)));   // 0 = sin módulo
   const h = hoja('alumnos');
   const cursos = partes(h.getRange(fila, columna('alumnos', 'Curso')).getValue()).filter(Boolean);
