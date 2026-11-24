@@ -288,6 +288,9 @@ body:not(.pn-con-sesion) .pn-main { max-width: none; padding: 0; }
   max-width: min(92vw, 520px); display: flex; gap: 10px; align-items: center; }
 .pn-toast::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amarillo); flex: none; }
 .pn-toast.pn-toast-mal::before { background: #f0a08e; }
+.pn-toast-btn { margin-left: 6px; background: none; border: 1.5px solid var(--amarillo); color: var(--amarillo); border-radius: 999px; padding: 4px 12px;
+  font-family: var(--narrow); font-weight: 700; font-size: 14px; cursor: pointer; min-height: 32px; }
+.pn-toast-btn:hover { background: var(--amarillo); color: #1d231f; }
 
 @media (prefers-reduced-motion: no-preference) {
   .pn-toast { animation: pn-sube .2s ease-out; }

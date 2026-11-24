@@ -53,10 +53,12 @@
   };
 
   let toastTimer = null;
-  function aviso(txt, mal) {
+  function aviso(txt, mal, deshacer) {
     const t = document.getElementById('toast');
-    t.textContent = txt; t.hidden = false; t.classList.toggle('pn-toast-mal', !!mal);
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 4200);
+    t.innerHTML = `<span>${esc(txt)}</span>` + (deshacer ? '<button class="pn-toast-btn" type="button">Deshacer</button>' : '');
+    t.hidden = false; t.classList.toggle('pn-toast-mal', !!mal);
+    if (deshacer) t.querySelector('button').addEventListener('click', () => { t.hidden = true; deshacer(); });
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, deshacer ? 8000 : 4200);
   }
 
   /* ---------- datos derivados ---------- */
@@ -75,9 +77,21 @@
     return Array.from(porMail.values()).sort((x, y) => x.nombre.localeCompare(y.nombre, 'es'));
   }
   const activos = () => alumnos().filter(a => a.activo);
+  // Mes de una cuota como número comparable (año*12 + mes). Si no dice el año, se toma el del vencimiento.
+  function mesNum(c) {
+    const t = sinTildes(c.mes);
+    const m = MESES.findIndex(x => t.indexOf(x) === 0);
+    if (m < 0) return null;
+    const y = (t.match(/(\d{4})/) || [])[1] || (String(c.vence).match(/(\d{4})/) || [])[1] || hoy().getFullYear();
+    return Number(y) * 12 + m;
+  }
+  const mesHoy = () => hoy().getFullYear() * 12 + hoy().getMonth();
+  const esFutura = c => { const n = mesNum(c); return n !== null && n > mesHoy(); };
+  const esDelMes = c => mesNum(c) === mesHoy();
+  const vigentes = () => datos.cuotas.filter(c => !esFutura(c));
   const cuotasDe = email => datos.cuotas.filter(c => c.email === email);
   function estadoCuota(email) {
-    const cs = cuotasDe(email);
+    const cs = cuotasDe(email).filter(c => !esFutura(c));
     if (!cs.length) return null;
     if (cs.some(c => c.vencida)) return 'vencida';
     if (cs.some(c => !/pagad/i.test(c.estado))) return 'pendiente';
@@ -89,8 +103,8 @@
     if (e === 'al-dia') return `<span class="pn-chip pn-ok">${I.ok}Al día</span>`;
     return '<span class="pn-chip pn-gris">Sin cuotas</span>';
   }
-  const chipApp = a => a.app ? `<span class="pn-chip pn-ok" title="Tiene los avisos activados">${I.campana}App</span>`
-                             : '<span class="pn-chip pn-gris" title="Todavía no activó los avisos">Sin app</span>';
+  const chipApp = a => a.app ? `<span class="pn-chip pn-ok" title="Le llegan los avisos al celular">${I.campana}Recibe avisos</span>`
+                             : '<span class="pn-chip pn-gris" title="Todavía no instaló la app del portal o no aceptó las notificaciones">Sin avisos</span>';
   const listaCursos = () => Array.from(new Set(datos.alumnos.flatMap(a => a.cursos.map(c => c.curso)).filter(Boolean))).sort();
   const listaCursoNivel = () => Array.from(new Set(datos.alumnos.flatMap(a => a.cursos.filter(c => c.curso && c.nivel).map(c => c.curso + ' · ' + c.nivel)))).sort();
   const estaPagada = c => /pagad/i.test(c.estado);
@@ -258,9 +272,9 @@
     const d = hoy();
     const lista = activos();
     const cursos = new Set(lista.flatMap(a => a.cursos.map(nombreCurso)));
-    const pendientes = datos.cuotas.filter(c => !estaPagada(c));
+    const pendientes = vigentes().filter(c => !estaPagada(c));
     const vencidas = pendientes.filter(c => c.vencida);
-    const delMes = datos.cuotas.filter(c => c.mes === mesActual());
+    const delMes = datos.cuotas.filter(esDelMes);
     const cobrado = delMes.filter(estaPagada);
     const conApp = lista.filter(a => a.app).length;
 
@@ -289,12 +303,12 @@
         <a class="pn-kpi" href="#cuotas" data-accion="ver-cuotas" data-filtro="pendientes"><span class="pn-kpi-label">Cuotas pendientes</span>
           <span class="pn-kpi-valor">${pendientes.length}</span>
           <span class="pn-kpi-sub">${plata(pendientes.reduce((t, c) => t + c.importe, 0))}${vencidas.length ? ' · ' + plural(vencidas.length, 'vencida') : ''}</span></a>
-        <a class="pn-kpi" href="#cuotas" data-accion="ver-cuotas" data-filtro="pagadas" data-mes="${esc(mesActual())}"><span class="pn-kpi-label">Cobrado en ${esc(MESES[d.getMonth()])}</span>
+        <a class="pn-kpi" href="#cuotas" data-accion="ver-cuotas" data-filtro="pagadas" data-mes="${esc((delMes[0] || {}).mes || '')}"><span class="pn-kpi-label">Cobrado en ${esc(MESES[d.getMonth()])}</span>
           <span class="pn-kpi-valor">${plata(cobrado.reduce((t, c) => t + c.importe, 0))}</span>
           <span class="pn-kpi-sub">${cobrado.length} de ${plural(delMes.length, 'cuota')}</span></a>
-        <a class="pn-kpi" href="#avisos"><span class="pn-kpi-label">Con la app</span>
+        <a class="pn-kpi" href="#avisos"><span class="pn-kpi-label">Reciben avisos</span>
           <span class="pn-kpi-valor">${conApp}<small class="pn-muted" style="font-size:.5em;font-weight:700"> / ${lista.length}</small></span>
-          <span class="pn-kpi-sub">${lista.length ? Math.round(conApp * 100 / lista.length) : 0}% recibe avisos</span></a>
+          <span class="pn-kpi-sub">${lista.length ? Math.round(conApp * 100 / lista.length) : 0}% tiene la app con avisos</span></a>
       </section>
 
       <div class="pn-grid pn-grid-2">
@@ -303,7 +317,7 @@
           ${clases.length ? `<ul class="pn-lista">${clases.map(c => `
             <li><span class="pn-hora">${esc(c.horaInicio || '—')}</span>
               <span class="pn-lista-txt"><b>${esc(nombreCurso(c))}</b>
-              <span class="pn-chico">${c.horaFin ? 'Hasta las ' + esc(c.horaFin) + ' · ' : ''}${esc(plural(c.alumnos.length, 'alumno'))}: ${esc(c.alumnos.slice(0, 4).join(', '))}${c.alumnos.length > 4 ? '…' : ''}</span></span>
+              <span class="pn-chico">${esc(plural(c.alumnos.length, 'alumno'))}: ${esc(c.alumnos.slice(0, 4).join(', '))}${c.alumnos.length > 4 ? '…' : ''}</span></span>
               ${url(c.meet) ? `<a class="pn-btn pn-btn-borde pn-btn-chico" ${ext} href="${url(c.meet)}" aria-label="Abrir Meet de ${esc(nombreCurso(c))}">${I.meet}Meet</a>` : ''}
             </li>`).join('')}</ul>` : '<p class="pn-vacio">Hoy no hay clases cargadas.</p>'}
         </section>
@@ -349,8 +363,9 @@
     if (sinDia.length) tareas.push(['sin día u horario: no reciben el aviso de clase', sinDia]);
     const sinPrograma = Array.from(new Set(lista.flatMap(a => a.cursos.filter(c => c.curso && c.nivel && !c.programa).map(nombreCurso))));
     if (sinPrograma.length) tareas.push(['cursos sin módulos en Programas', sinPrograma]);
-    const conCuota = new Set(datos.cuotas.filter(c => c.mes === mesActual()).map(c => c.email));
-    const sinCuota = lista.filter(a => a.email && !conCuota.has(a.email)).map(a => a.nombre);
+    // Solo si ya empezaron a cargar las cuotas del mes: muestra a quién le falta.
+    const conCuota = new Set(datos.cuotas.filter(esDelMes).map(c => c.email));
+    const sinCuota = conCuota.size ? lista.filter(a => a.email && !conCuota.has(a.email)).map(a => a.nombre) : [];
     if (sinCuota.length) tareas.push([`sin la cuota de ${mesActual()} cargada`, sinCuota]);
     if (!tareas.length) return '';
     return `
@@ -366,7 +381,8 @@
   function vAlumnos() {
     return `
       <header class="pn-cab"><div><p class="pn-eyebrow">Alumnos</p><h1 class="pn-h1">Quién cursa y cómo va</h1>
-        <p class="pn-lead">Con los botones − y + pasan a un alumno de módulo; el portal y su barra de avance se actualizan solos.</p></div></header>
+        <p class="pn-lead">Con los botones − y + pasan a un alumno de módulo; el portal y su barra de avance se actualizan solos.</p>
+        <p class="pn-chico">«Recibe avisos»: instaló la app del portal y le llegan las notificaciones al celular. «Sin avisos»: todavía no, así que los avisos no le llegan.</p></div></header>
       <div class="pn-herr">
         <label class="pn-buscar">${I.buscar}
           <input class="pn-input" type="search" id="buscar-alumno" placeholder="Buscar por nombre o mail" aria-label="Buscar alumno" value="${esc(st.buscar)}" autocomplete="off"></label>
@@ -412,7 +428,7 @@
               <span class="pn-barra" aria-hidden="true"><span style="width:${pct}%"></span></span></span>
             <span class="pn-paso" role="group" aria-label="Módulo actual de ${esc(a.nombre)} en ${esc(c.curso)}">
               <button type="button" data-accion="modulo" data-fila="${c.fila}" data-indice="${c.indice}" data-email="${esc(c.email)}" data-valor="${c.modulo - 1}"
-                aria-label="Bajar un módulo"${c.modulo <= 1 || !c.email ? ' disabled' : ''}>−</button>
+                aria-label="${c.modulo === 1 ? 'Volver a sin módulo' : 'Bajar un módulo'}"${c.modulo < 1 || !c.email ? ' disabled' : ''}>−</button>
               <output>${terminado ? 'Terminado' : c.modulo ? 'Módulo ' + c.modulo : 'Sin módulo'}</output>
               <button type="button" data-accion="modulo" data-fila="${c.fila}" data-indice="${c.indice}" data-email="${esc(c.email)}" data-valor="${(c.modulo || 0) + 1}"
                 aria-label="${c.total && c.modulo === c.total ? 'Marcar el nivel como terminado' : 'Pasar al módulo siguiente'}"${!c.email || terminado ? ' disabled' : ''}>+</button>
@@ -445,15 +461,21 @@
   }
   function vCuotas() {
     const meses = mesesDeCuotas();
-    if (st.mes === null) st.mes = meses.indexOf(mesActual()) >= 0 ? mesActual() : (meses[meses.length - 1] || '');
+    if (st.mes === null) {
+      // Por defecto, el mes en curso; si no está cargado, el último mes que ya empezó.
+      const pasados = meses.filter(m => !esFutura(datos.cuotas.find(c => c.mes === m)));
+      const actual = meses.find(m => esDelMes(datos.cuotas.find(c => c.mes === m)));
+      st.mes = actual || pasados[pasados.length - 1] || '';
+    }
+    const etiquetaMes = m => { const c = datos.cuotas.find(x => x.mes === m); return esFutura(c) ? m + ' (todavía no empezó)' : m; };
     const filtros = [['pendientes', 'Pendientes'], ['vencidas', 'Vencidas'], ['pagadas', 'Pagadas'], ['todas', 'Todas']];
     return `
       <header class="pn-cab"><div><p class="pn-eyebrow">Cuotas</p><h1 class="pn-h1">Quién pagó y quién no</h1>
         <p class="pn-lead">Cuando confirman una transferencia, toquen «Marcar pagada»: el alumno lo ve en su portal y dejan de llegarle recordatorios.</p></div></header>
       <div class="pn-herr">
         <select class="pn-select" id="filtro-mes" aria-label="Mes">
-          <option value="">Todos los meses</option>
-          ${meses.map(m => `<option${m === st.mes ? ' selected' : ''}>${esc(m)}</option>`).join('')}
+          <option value="">Todos los meses que ya empezaron</option>
+          ${meses.map(m => `<option value="${esc(m)}"${m === st.mes ? ' selected' : ''}>${esc(etiquetaMes(m))}</option>`).join('')}
         </select>
         <div class="pn-seg" role="group" aria-label="Estado">${filtros.map(([k, t]) =>
           `<button type="button" data-accion="filtro-cuota" data-filtro="${k}" aria-pressed="${st.filtro === k}">${t}</button>`).join('')}</div>
@@ -462,7 +484,8 @@
       <div id="resultados">${listaCuotas()}</div>`;
   }
   function listaCuotas() {
-    const delMes = datos.cuotas.filter(c => !st.mes || c.mes === st.mes);
+    const delMes = st.mes ? datos.cuotas.filter(c => c.mes === st.mes) : vigentes();
+    const futuro = delMes.length && delMes.every(esFutura);
     const total = delMes.reduce((t, c) => t + c.importe, 0);
     const pagadas = delMes.filter(estaPagada);
     const cobrado = pagadas.reduce((t, c) => t + c.importe, 0);
@@ -477,6 +500,7 @@
       <section class="pn-card pn-resumen-cobro">
         <div class="pn-cifras"><b>${plata(cobrado)}</b><span class="pn-muted">cobrado de ${plata(total)}${st.mes ? ' en ' + esc(st.mes.toLowerCase()) : ''}</span></div>
         <div class="pn-barra pn-barra-grande" role="img" aria-label="${pct}% cobrado"><span style="width:${pct}%"></span></div>
+        ${futuro ? '<p class="pn-chico">Este mes todavía no empezó: estas cuotas cuentan como pendientes desde el día 1. Si alguien paga antes, ya pueden marcarla.</p>' : ''}
         <p class="pn-chico">${plural(pagadas.length, 'pagada')} · ${plural(delMes.length - pagadas.length, 'pendiente')}${vencidas ? ' · ' + plural(vencidas, 'vencida') : ''}</p>
       </section>
       <section class="pn-card">
@@ -485,7 +509,7 @@
             <span class="pn-cuota-info"><span class="pn-cuota-dato">${esc(c.monto)}</span>
             <span class="pn-cuota-dato"><small>Vence</small>${esc(c.vence || '—')}</span>
             <span class="pn-cuota-dato">${estaPagada(c) ? `<span class="pn-chip pn-ok">${I.ok}Pagada${c.fechaPago ? ' el ' + esc(c.fechaPago.slice(0, 5)) : ''}</span>`
-              : c.vencida ? `<span class="pn-chip pn-mal">${I.alerta}Vencida</span>` : `<span class="pn-chip pn-pend">${I.reloj}Pendiente</span>`}</span></span>
+              : c.vencida ? `<span class="pn-chip pn-mal">${I.alerta}Vencida</span>` : esFutura(c) ? `<span class="pn-chip pn-gris">${I.reloj}Desde el día 1</span>` : `<span class="pn-chip pn-pend">${I.reloj}Pendiente</span>`}</span></span>
             <span class="pn-cuota-acc">${botonCuota(c)}</span></li>`).join('')}</ul>`
           : `<p class="pn-vacio">${datos.cuotas.length ? 'No hay cuotas con ese filtro.' : 'Todavía no hay cuotas cargadas en la planilla.'}</p>`}
       </section>`;
@@ -630,7 +654,7 @@
   }
 
   /* ---------- acciones ---------- */
-  async function accion(nombre, extra, cambioLocal, ok) {
+  async function accion(nombre, extra, cambioLocal, ok, deshacer) {
     const copia = JSON.stringify(datos);
     if (cambioLocal) { cambioLocal(); mostrar(true); }
     try {
@@ -640,7 +664,7 @@
       if (r.error === 'link') { aviso('El link tiene que empezar con https://', true); datos = JSON.parse(copia); mostrar(true); return false; }
       if (!recibir(r)) return false;
       mostrar(true);
-      if (ok) aviso(typeof ok === 'function' ? ok() : ok);
+      if (ok) aviso(typeof ok === 'function' ? ok() : ok, false, deshacer);
       return true;
     } catch (e) {
       datos = JSON.parse(copia); mostrar(true);
@@ -660,20 +684,10 @@
       case 'ver-cuotas': st.filtro = d.filtro || 'pendientes'; if (d.mes) st.mes = d.mes; else if (d.filtro !== 'pagadas') st.mes = ''; break;
       case 'filtro-cuota': st.filtro = d.filtro; mostrar(true); break;
       case 'copiar': copiar(d.texto); break;
-      case 'cuota': {
-        const fila = Number(d.fila), pagar = d.estado === 'Pagado';
-        accion('panel-cuota', { fila, email: d.email, mes: d.mes, estado: d.estado }, () => {
-          const c = datos.cuotas.find(x => x.fila === fila);
-          if (c) { c.estado = d.estado; c.vencida = false; c.fechaPago = pagar ? datos.hoy : ''; }
-        }, pagar ? 'Cuota marcada como pagada.' : 'La cuota volvió a pendiente.');
-        break;
-      }
+      case 'cuota': cambiarCuota(Number(d.fila), d.email, d.mes, d.estado); break;
       case 'modulo': {
         const fila = Number(d.fila), indice = Number(d.indice), valor = Number(d.valor);
-        accion('panel-modulo', { fila, indice, email: d.email, valor }, () => {
-          const f = datos.alumnos.find(x => x.fila === fila);
-          if (f && f.cursos[indice]) f.cursos[indice].modulo = valor;
-        }, 'Módulo ' + valor + ' guardado.');
+        cambiarModulo(fila, indice, d.email, valor);
         break;
       }
       case 'aviso-confirmar': if (st.aviso.titulo.trim()) { st.confirmar = true; pintar('av-botones', botonesAviso()); } break;
@@ -683,6 +697,26 @@
       case 'mensaje-quitar': guardarMensaje(''); break;
     }
   });
+
+  function cambiarModulo(fila, indice, email, valor) {
+    const f = datos.alumnos.find(x => x.fila === fila);
+    const antes = f && f.cursos[indice] ? f.cursos[indice].modulo : 0;
+    accion('panel-modulo', { fila, indice, email, valor }, () => {
+      const g = datos.alumnos.find(x => x.fila === fila);
+      if (g && g.cursos[indice]) g.cursos[indice].modulo = valor;
+    }, valor ? 'Módulo ' + valor + ' guardado.' : 'Quedó sin módulo.', () => cambiarModulo(fila, indice, email, antes));
+  }
+
+  function cambiarCuota(fila, email, mes, estado) {
+    const c0 = datos.cuotas.find(x => x.fila === fila);
+    const antes = c0 ? { vencida: c0.vencida, fechaPago: c0.fechaPago } : {};
+    const pagar = estado === 'Pagado';
+    accion('panel-cuota', { fila, email, mes, estado }, () => {
+      const c = datos.cuotas.find(x => x.fila === fila);
+      if (c) { c.estado = estado; c.vencida = pagar ? false : !!antes.vencida; c.fechaPago = pagar ? datos.hoy : ''; }
+    }, pagar ? 'Cuota marcada como pagada.' : 'La cuota volvió a pendiente.',
+       () => cambiarCuota(fila, email, mes, pagar ? 'Pendiente' : 'Pagado'));
+  }
 
   async function enviarAviso() {
     const v = st.aviso;

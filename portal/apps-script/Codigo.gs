@@ -182,9 +182,18 @@ function plata(v) {
   return texto(v);
 }
 
+// Acepta «19:00», «19», «8.30», «8,30», «19 hs» o una hora de Sheets, y devuelve siempre «HH:mm».
 function hora(v) {
   if (v instanceof Date) return Utilities.formatDate(v, ZONA, 'HH:mm');
-  return String(v || '').trim();
+  if (typeof v === 'number' && v > 0 && v < 1) {   // fracción de día
+    const min = Math.round(v * 1440);
+    return ('0' + Math.floor(min / 60)).slice(-2) + ':' + ('0' + (min % 60)).slice(-2);
+  }
+  const t = String(v == null ? '' : v).trim();
+  const m = t.match(/^(\d{1,2})(?:\s*[:.,h]\s*(\d{1,2}))?\s*(?:hs?\.?|horas?)?$/i);
+  if (!m || Number(m[1]) > 23) return t;
+  const min = m[2] ? (m[2].length === 1 ? m[2] + '0' : m[2]) : '00';
+  return ('0' + m[1]).slice(-2) + ':' + min;
 }
 
 function buscarAlumno(email) {
@@ -685,11 +694,11 @@ function panelCuota(p) {
 function panelModulo(p) {
   const fila = filaConfirmada('alumnos', p.fila, p.email);
   if (!fila) return { error: 'cambio' };
-  const valor = Math.max(1, Math.min(99, Math.round(Number(p.valor) || 0)));
+  const valor = Math.max(0, Math.min(99, Math.round(Number(p.valor) || 0)));   // 0 = sin módulo
   const h = hoja('alumnos');
   const cursos = partes(h.getRange(fila, columna('alumnos', 'Curso')).getValue()).filter(Boolean);
   const celda = h.getRange(fila, columna('alumnos', 'Módulo actual'));
-  if (cursos.length <= 1) { celda.setValue(valor); return null; }
+  if (cursos.length <= 1) { if (valor) celda.setValue(valor); else celda.clearContent(); return null; }
   let mods = partes(celda.getValue());
   if (mods.length !== cursos.length) mods = cursos.map(() => mods[0] || '');
   const i = Math.max(0, Math.min(cursos.length - 1, Number(p.indice) || 0));
