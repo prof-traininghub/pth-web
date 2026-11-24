@@ -60,11 +60,11 @@ function doPost(e) {
   if (String(pedido.accion || '').indexOf('panel') === 0) return json(panel(pedido, usuario, sesion));
 
   const cache = CacheService.getScriptCache();
-  const claveCache = 'datos:' + versionDatos() + ':' + usuario.email;
+  const claveCache = 'datos:' + claveVersion() + ':' + usuario.email;
   if (pedido.accion === 'datos') {
-    const guardado = cache.get(claveCache);
-    if (guardado) {
-      const r = JSON.parse(guardado);
+    const r = descomprimir(cache.get(claveCache));
+    if (r) {
+      if (usuario.foto) r.alumno.foto = usuario.foto;
       if (sesion) r.sesion = sesion;
       return json(r);
     }
@@ -74,14 +74,15 @@ function doPost(e) {
   if (!alumno) return json({ error: 'no-alumno', email: usuario.email });
 
   if (pedido.accion === 'datos') {
+    precargar(['alumnos', 'cuotas', 'programas', 'niveles', 'suscripciones', 'devoluciones', 'config']);
     const r = datosDelAlumno(alumno, usuario);
-    try { cache.put(claveCache, JSON.stringify(r), 600); } catch (e) { /* demasiado grande: sin caché */ }
+    guardarEnCache({ [claveCache]: r });
     if (sesion) r.sesion = sesion;
     return json(r);
   }
   if (pedido.accion === 'opinion') return json(guardarOpinion(alumno, pedido.opinion || {}));
-  if (pedido.accion === 'avisos') { cache.remove(claveCache); return json(guardarSuscripcion(alumno, pedido)); }
-  if (pedido.accion === 'avisos-baja') { cache.remove(claveCache); return json(borrarSuscripcion(usuario.email, pedido.fcm)); }
+  if (pedido.accion === 'avisos') { const r = guardarSuscripcion(alumno, pedido); datosCambiaron(); return json(r); }
+  if (pedido.accion === 'avisos-baja') { const r = borrarSuscripcion(usuario.email, pedido.fcm); datosCambiaron(); return json(r); }
   return json({ error: 'accion' });
 }
 
@@ -136,6 +137,39 @@ function leerSesion(s) {
 
 // Cada cambio en la planilla invalida la caché de datos de todos los alumnos.
 function versionDatos() { return PropertiesService.getScriptProperties().getProperty('VERSION_DATOS') || '0'; }
+// La caché cambia con cada edición de la planilla y también cada día (cuotas vencidas, mes que empieza).
+function claveVersion() { return versionDatos() + ':' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd'); }
+function comprimir(obj) { return Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(obj), 'application/json')).getBytes()); }
+function descomprimir(z) {
+  if (!z) return null;
+  try { return JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(z), 'application/x-gzip')).getDataAsString()); }
+  catch (e) { return null; }
+}
+function guardarEnCache(lote) {
+  const ok = {};
+  Object.keys(lote).forEach(k => { const z = comprimir(lote[k]); if (z.length < 95000) ok[k] = z; });
+  try { CacheService.getScriptCache().putAll(ok, 21600); } catch (e) { console.warn('caché: ' + e.message); }
+}
+
+// Deja listos los datos del panel y de cada alumno para que el próximo pedido salga de la caché.
+// Lo llama el activador de cada 5 minutos, solo si la planilla cambió o cambió el día.
+function calentar(forzar) {
+  const props = PropertiesService.getScriptProperties();
+  const clave = claveVersion();
+  if (!forzar && props.getProperty('CALENTADO') === clave) return;
+  precargar();
+  const lote = {};
+  lote['panel:' + clave] = datosPanel({ email: '', nombre: '' });
+  const vistos = {};
+  filas('alumnos').forEach(a => {
+    const email = texto(a['Mail de Google']).toLowerCase();
+    if (!email || vistos[email] || /^no$/i.test(texto(a['Activo']))) return;
+    vistos[email] = 1;
+    lote['datos:' + clave + ':' + email] = datosDelAlumno(a, { email: email, nombre: '', foto: '' });
+  });
+  guardarEnCache(lote);
+  props.setProperty('CALENTADO', clave);
+}
 function datosCambiaron() { PropertiesService.getScriptProperties().setProperty('VERSION_DATOS', String(Date.now())); }
 
 /* ---------------- Lectura de la planilla ---------------- */
@@ -144,18 +178,41 @@ function hoja(clave) {
   return planilla().getSheetByName(NOMBRES[clave]);
 }
 
+// Lee varias pestañas en UN solo pedido a la API de Sheets (leerlas una por una tarda ~0,4 s cada una).
+// Las fechas llegan como texto con el formato de la celda; si la API falla, filas() lee pestaña por pestaña.
+const _crudo = {};
+function precargar(claves) {
+  claves = (claves || Object.keys(NOMBRES)).filter(k => !_crudo[k] && !_filas[k]);
+  if (!claves.length) return;
+  try {
+    const r = Sheets.Spreadsheets.Values.batchGet(PLANILLA_ID, {
+      ranges: claves.map(k => "'" + NOMBRES[k] + "'"),
+      valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING'
+    });
+    (r.valueRanges || []).forEach((vr, i) => { _crudo[claves[i]] = vr.values || []; });
+  } catch (e) {
+    if (claves.length > 1) claves.forEach(k => precargar([k]));   // falta una pestaña: las demás igual
+    else console.warn('precargar ' + claves[0] + ': ' + e.message);
+  }
+}
+
 const _filas = {};
 function filas(clave) {
   if (_filas[clave]) return _filas[clave];
-  const h = hoja(clave);
-  if (!h || h.getLastRow() < 2) return (_filas[clave] = []);
-  const valores = h.getDataRange().getValues();
+  let valores = _crudo[clave];
+  if (!valores) {
+    const h = hoja(clave);
+    if (!h || h.getLastRow() < 2) return (_filas[clave] = []);
+    valores = h.getDataRange().getValues();
+  }
+  valores = valores.slice();
+  if (valores.length < 2) return (_filas[clave] = []);
   const encabezados = valores.shift().map(String);
   // _fila: número de fila en la planilla (lo usa el panel para escribir en el lugar justo).
   return (_filas[clave] = valores
     .map((f, n) => [f, n + 2])
     .filter(([f]) => f.some(c => c !== '' && c !== null))
-    .map(([f, n]) => Object.assign(Object.fromEntries(encabezados.map((e, i) => [e, f[i]])), { _fila: n })));
+    .map(([f, n]) => Object.assign(Object.fromEntries(encabezados.map((e, i) => [e, f[i] === undefined ? '' : f[i]])), { _fila: n })));
 }
 
 function texto(v) {
@@ -172,6 +229,8 @@ function mes(v) {
   if (v instanceof Date) {
     return MESES[Number(Utilities.formatDate(v, ZONA, 'M')) - 1] + ' ' + Utilities.formatDate(v, ZONA, 'yyyy');
   }
+  const f = texto(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);   // fecha leída como texto: 1/12/2026
+  if (f && Number(f[2]) >= 1 && Number(f[2]) <= 12) return MESES[Number(f[2]) - 1] + ' ' + f[3];
   const t = texto(v);
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
@@ -201,10 +260,13 @@ function hora(v) {
     return ('0' + Math.floor(min / 60)).slice(-2) + ':' + ('0' + (min % 60)).slice(-2);
   }
   const t = String(v == null ? '' : v).trim();
-  const m = t.match(/^(\d{1,2})(?:\s*[:.,h]\s*(\d{1,2}))?\s*(?:hs?\.?|horas?)?$/i);
+  const m = t.match(/^(\d{1,2})(?:\s*[:.,h]\s*(\d{1,2}))?(?::\d{2})?\s*(a\.?\s*m\.?|p\.?\s*m\.?)?\s*(?:hs?\.?|horas?)?$/i);
   if (!m || Number(m[1]) > 23) return t;
+  let h = Number(m[1]);
+  if (m[3] && /^p/i.test(m[3]) && h < 12) h += 12;
+  if (m[3] && /^a/i.test(m[3]) && h === 12) h = 0;
   const min = m[2] ? (m[2].length === 1 ? m[2] + '0' : m[2]) : '00';
-  return ('0' + m[1]).slice(-2) + ':' + min;
+  return ('0' + h).slice(-2) + ':' + min;
 }
 
 function buscarAlumno(email) {
@@ -305,7 +367,7 @@ function datosDelAlumno(a, usuario) {
   const devoluciones = filas('devoluciones')
     .filter(d => extraerMail(d['Alumno']) === email)
     .map(d => ({
-      fecha: texto(Object.values(d)[0]),
+      fecha: soloFecha(Object.values(d)[0]),
       habilidades: ['Speaking', 'Listening', 'Reading', 'Writing'].map(h => ({
         nombre: h, nivel: texto(d['¿Cómo está en cada habilidad? [' + h + ']'])
       })),
@@ -455,13 +517,16 @@ function enviarAvisos() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(2000)) return;
   try {
+    precargar(['suscripciones', 'alumnos', 'cuotas']);
     const subs = filas('suscripciones');
-    if (!subs.length) return;
-    const activos = filas('alumnos').filter(a => texto(a['Mail de Google']) && !/^no$/i.test(texto(a['Activo'])));
-    avisosManuales(subs, activos);
-    avisosDeClase(subs, activos);
-    avisosDeCuota(subs, activos);
+    if (subs.length) {
+      const activos = filas('alumnos').filter(a => texto(a['Mail de Google']) && !/^no$/i.test(texto(a['Activo'])));
+      avisosManuales(subs, activos);
+      avisosDeClase(subs, activos);
+      avisosDeCuota(subs, activos);
+    }
   } finally { lock.releaseLock(); }
+  try { calentar(); } catch (e) { console.warn('calentar: ' + e.message); }
 }
 
 function tokensDe(subs, emails, tipo) {
@@ -475,6 +540,7 @@ function avisosManuales(subs, activos) {
   if (!h || h.getLastRow() < 2) return;
   const valores = h.getRange(2, 1, h.getLastRow() - 1, 6).getValues();
   const ahora = new Date();
+  let cambio = false;
   valores.forEach((f, i) => {
     const [cuando, para, titulo, mensaje, link, estado] = f;
     if (!texto(titulo) || texto(estado)) return;
@@ -482,9 +548,11 @@ function avisosManuales(subs, activos) {
     const emails = destinatarios(texto(para), activos);
     const n = enviarPush(tokensDe(subs, emails, 'Novedades'),
       { titulo: texto(titulo), cuerpo: texto(mensaje), link: texto(link), tag: 'aviso-' + (i + 2) });
+    cambio = true;
     h.getRange(i + 2, 6).setValue(n ? 'Enviado el ' + Utilities.formatDate(ahora, ZONA, 'dd/MM HH:mm') + ' a ' + n + ' dispositivo' + (n === 1 ? '' : 's')
                                      : 'Sin destinatarios con avisos activados');
   });
+  if (cambio) datosCambiaron();
 }
 
 // «Todos» (o vacío), un curso, «Curso · Nivel», un nivel o mails; varios separados por coma.
@@ -563,8 +631,13 @@ function avisosDeCuota(subs, activos) {
 function fechaDe(v) {
   if (v instanceof Date) return v;
   const m = texto(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12) : null;
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12);
+  const iso = texto(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return iso ? new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), 12) : null;
 }
+
+// «24/11/2026 14:03:10» → «24/11/2026» (marcas de tiempo de formularios y opiniones).
+function soloFecha(v) { return texto(v).replace(/^(\d{1,2}\/\d{1,2}\/\d{4})\s.*$/, '$1'); }
 
 /* ---------------- Panel de PTH (proftraininghub.com.ar/panel/) ---------------- */
 
@@ -594,10 +667,18 @@ function panel(pedido, usuario, sesion) {
     try { problema = accion(); } finally { lock.releaseLock(); }
     if (!problema) datosCambiaron();
     Object.keys(_filas).forEach(k => delete _filas[k]);   // releer lo que se acaba de escribir
+    Object.keys(_crudo).forEach(k => delete _crudo[k]);
   }
   if (problema && problema.error) return problema;
   if (pedido.accion === 'panel-aviso' && !pedido.cuando) enviarAvisos();   // sale ya, sin esperar el ciclo de 5 min
-  const r = datosPanel(usuario);
+  const clave = 'panel:' + claveVersion();
+  let r = pedido.accion === 'panel' ? descomprimir(CacheService.getScriptCache().get(clave)) : null;
+  if (!r) {
+    precargar();
+    r = datosPanel(usuario);
+    guardarEnCache({ [clave]: r });
+  }
+  r.admin = { email: usuario.email, nombre: usuario.nombre };
   if (sesion) r.sesion = sesion;
   return r;
 }
@@ -637,7 +718,7 @@ function datosPanel(usuario) {
   });
 
   const devoluciones = filas('devoluciones').map(d => ({
-    fecha: texto(Object.values(d)[0]), docente: texto(d['Docente']),
+    fecha: soloFecha(Object.values(d)[0]), docente: texto(d['Docente']),
     alumno: texto(d['Alumno']).replace(/\s*<[^>]*>\s*$/, ''), email: extraerMail(d['Alumno']),
     habilidades: ['Speaking', 'Listening', 'Reading', 'Writing'].map(h => ({
       nombre: h, nivel: texto(d['¿Cómo está en cada habilidad? [' + h + ']']) })),
@@ -646,7 +727,7 @@ function datosPanel(usuario) {
   })).reverse();
 
   const opiniones = filas('opiniones').map(o => ({
-    fecha: texto(o['Fecha']), nombre: texto(o['Nombre']), curso: texto(o['Curso']),
+    fecha: soloFecha(o['Fecha']), nombre: texto(o['Nombre']), curso: texto(o['Curso']),
     nota: Number(o['Nota']) || 0, tema: texto(o['Tema']), sirve: texto(o['Lo que más sirve']),
     cambiaria: texto(o['Qué cambiaría'])
   })).reverse();
@@ -796,19 +877,24 @@ function crearFormularioDevoluciones() {
 
 function actualizarFormulario() {
   datosCambiaron();
-  const id = PropertiesService.getScriptProperties().getProperty('FORM_ID');
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('FORM_ID');
   if (!id) return;
+  precargar(['alumnos', 'docentes']);
+  const docentes = unicos(filas('docentes').map(d => texto(d['Docente'])).filter(Boolean));
+  const alumnos = unicos(filas('alumnos')
+    .filter(a => texto(a['Mail de Google']) && !/^no$/i.test(texto(a['Activo'])))
+    .map(a => texto(a['Nombre']) + ' <' + texto(a['Mail de Google']).toLowerCase() + '>'));
+  // La mayoría de las ediciones no cambian nombres ni mails: entonces no hace falta abrir el formulario (es lo lento).
+  const firma = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify([docentes, alumnos])));
+  if (props.getProperty('FORM_FIRMA') === firma) return;
   const form = FormApp.openById(id);
   const listas = form.getItems(FormApp.ItemType.LIST).map(i => i.asListItem());
   const lista = listas.find(i => i.getTitle() === 'Alumno');
   const listaDocentes = listas.find(i => i.getTitle() === 'Docente');
-  const docentes = filas('docentes').map(d => texto(d['Docente'])).filter(Boolean);
-  if (listaDocentes && docentes.length) listaDocentes.setChoiceValues(unicos(docentes));
-  if (!lista) return;
-  const alumnos = filas('alumnos')
-    .filter(a => texto(a['Mail de Google']) && !/^no$/i.test(texto(a['Activo'])))
-    .map(a => texto(a['Nombre']) + ' <' + texto(a['Mail de Google']).toLowerCase() + '>');
-  if (alumnos.length) lista.setChoiceValues(unicos(alumnos));
+  if (listaDocentes && docentes.length) listaDocentes.setChoiceValues(docentes);
+  if (lista && alumnos.length) lista.setChoiceValues(alumnos);
+  props.setProperty('FORM_FIRMA', firma);
 }
 
 // Forms no acepta opciones repetidas (un alumno cargado dos veces, una fila a medio completar).
@@ -928,4 +1014,22 @@ function probarFirebase() {
     payload: JSON.stringify({ validate_only: true, message: { token: 'prueba', data: { title: 'prueba' } } })
   });
   Logger.log(r.getResponseCode() + ' ' + r.getContentText().slice(0, 300));
+}
+
+// Diagnóstico: cuánto tarda cada parte (Ejecutar desde el editor y mirar el registro).
+function medirTiempos() {
+  const t0 = Date.now(), log = [];
+  let t = Date.now();
+  precargar(); log.push('leer todo en un pedido ' + (Date.now() - t) + ' ms');
+  ['alumnos', 'cuotas', 'programas', 'niveles', 'suscripciones', 'devoluciones', 'opiniones', 'avisos', 'config', 'docentes'].forEach(k => {
+    t = Date.now(); const n = filas(k).length; log.push(k + ' ' + n + ' filas ' + (Date.now() - t) + ' ms');
+  });
+  t = Date.now(); const p = datosPanel({ email: 'prof.traininghub@gmail.com', nombre: '' });
+  log.push('armar panel ' + (Date.now() - t) + ' ms, ' + JSON.stringify(p).length + ' caracteres');
+  const a = filas('alumnos').find(x => texto(x['Mail de Google']));
+  if (a) { t = Date.now(); datosDelAlumno(a, { email: texto(a['Mail de Google']).toLowerCase(), nombre: '', foto: '' }); log.push('armar alumno ' + (Date.now() - t) + ' ms'); }
+  t = Date.now(); const z = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(p))).getBytes());
+  log.push('gzip ' + (Date.now() - t) + ' ms, ' + z.length + ' caracteres');
+  log.push('total ' + (Date.now() - t0) + ' ms');
+  Logger.log(log.join('\n'));
 }
