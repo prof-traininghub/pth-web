@@ -183,6 +183,17 @@ function plata(v) {
 }
 
 // Acepta «19:00», «19», «8.30», «8,30», «19 hs» o una hora de Sheets, y devuelve siempre «HH:mm».
+// Las cuotas se pagan del 1 al 10: la de un mes que todavía no empezó no se le muestra al alumno.
+function mesEmpezo(c) {
+  const t = sinTildes(mes(c['Mes']));
+  const m = MESES.findIndex(x => t.indexOf(sinTildes(x)) === 0);
+  if (m < 0) return true;
+  const y = Number((t.match(/(\d{4})/) || [])[1] || (texto(c['Vence']).match(/(\d{4})/) || [])[1] ||
+                   Utilities.formatDate(new Date(), ZONA, 'yyyy'));
+  const ahora = Number(Utilities.formatDate(new Date(), ZONA, 'yyyy')) * 12 + Number(Utilities.formatDate(new Date(), ZONA, 'M')) - 1;
+  return y * 12 + m <= ahora;
+}
+
 function hora(v) {
   if (v instanceof Date) return Utilities.formatDate(v, ZONA, 'HH:mm');
   if (typeof v === 'number' && v > 0 && v < 1) {   // fracción de día
@@ -284,7 +295,7 @@ function datosDelAlumno(a, usuario) {
 
   const email = usuario.email;
   const cuotas = filas('cuotas')
-    .filter(c => texto(c['Mail de Google']).toLowerCase() === email)
+    .filter(c => texto(c['Mail de Google']).toLowerCase() === email && mesEmpezo(c))
     .map(c => ({
       mes: mes(c['Mes']), monto: plata(c['Monto']), vence: texto(c['Vence']),
       estado: texto(c['Estado']) || 'Pendiente', fechaPago: texto(c['Fecha de pago']), medio: texto(c['Medio'])

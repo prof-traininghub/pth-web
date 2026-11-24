@@ -88,11 +88,19 @@
   const mesHoy = () => hoy().getFullYear() * 12 + hoy().getMonth();
   const esFutura = c => { const n = mesNum(c); return n !== null && n > mesHoy(); };
   const esDelMes = c => mesNum(c) === mesHoy();
+  const desde = c => { const n = mesNum(c); return n === null ? '' : 'Se paga desde el 1/' + (n % 12 + 1); };
+  function chipEstado(c) {
+    if (estaPagada(c)) return `<span class="pn-chip pn-ok">${I.ok}Pagada${c.fechaPago ? ' el ' + esc(c.fechaPago.slice(0, 5)) : ''}</span>`;
+    if (c.vencida) return `<span class="pn-chip pn-mal">${I.alerta}Vencida</span>`;
+    if (esFutura(c)) return `<span class="pn-chip pn-gris">${I.reloj}${desde(c)}</span>`;
+    return `<span class="pn-chip pn-pend">${I.reloj}Pendiente</span>`;
+  }
   const vigentes = () => datos.cuotas.filter(c => !esFutura(c));
   const cuotasDe = email => datos.cuotas.filter(c => c.email === email);
   function estadoCuota(email) {
-    const cs = cuotasDe(email).filter(c => !esFutura(c));
-    if (!cs.length) return null;
+    const todas = cuotasDe(email);
+    const cs = todas.filter(c => !esFutura(c));
+    if (!cs.length) return todas.length ? 'al-dia' : null;   // solo tiene cuotas de un mes que no empezó
     if (cs.some(c => c.vencida)) return 'vencida';
     if (cs.some(c => !/pagad/i.test(c.estado))) return 'pendiente';
     return 'al-dia';
@@ -441,7 +449,7 @@
             ${url(c.meet) ? `<a class="pn-link" ${ext} href="${url(c.meet)}">Meet</a>` : ''}${url(c.classroom) ? `<a class="pn-link" ${ext} href="${url(c.classroom)}">Classroom</a>` : ''}
             ${!url(c.meet) && !url(c.classroom) ? '<span class="pn-muted">Sin links</span>' : ''}</span></li>`).join('')}
             ${a.email ? `<li><button class="pn-link" type="button" data-accion="copiar" data-texto="${esc(a.email)}">Copiar mail</button></li>` : ''}</ul></div>
-          <div><h3>Cuotas</h3>${cs.length ? `<ul>${cs.slice(0, 4).map(c => `<li><span>${esc(c.mes)} · ${esc(c.monto)}</span>${estaPagada(c) ? '<span class="pn-chip pn-ok">Pagada</span>' : c.vencida ? '<span class="pn-chip pn-mal">Vencida</span>' : '<span class="pn-chip pn-pend">Pendiente</span>'}</li>`).join('')}</ul>` : '<p class="pn-muted">Sin cuotas cargadas.</p>'}</div>
+          <div><h3>Cuotas</h3>${cs.length ? `<ul>${cs.slice(0, 4).map(c => `<li><span>${esc(c.mes)} · ${esc(c.monto)}</span>${chipEstado(c)}</li>`).join('')}</ul>` : '<p class="pn-muted">Sin cuotas cargadas.</p>'}</div>
           <div><h3>Devoluciones</h3>${devs.length ? `<ul>${devs.slice(0, 3).map(v => `<li><span>${esc(v.fecha)}</span><span class="pn-muted">${esc(v.docente)}</span></li>`).join('')}</ul>` : '<p class="pn-muted">Todavía no tiene.</p>'}</div>
         </div>` : ''}
       </article>`;
@@ -508,8 +516,7 @@
           <li><span class="pn-lista-txt"><b>${esc(c.nombre)}</b><span class="pn-chico">${esc(c.mes)}</span></span>
             <span class="pn-cuota-info"><span class="pn-cuota-dato">${esc(c.monto)}</span>
             <span class="pn-cuota-dato"><small>Vence</small>${esc(c.vence || '—')}</span>
-            <span class="pn-cuota-dato">${estaPagada(c) ? `<span class="pn-chip pn-ok">${I.ok}Pagada${c.fechaPago ? ' el ' + esc(c.fechaPago.slice(0, 5)) : ''}</span>`
-              : c.vencida ? `<span class="pn-chip pn-mal">${I.alerta}Vencida</span>` : esFutura(c) ? `<span class="pn-chip pn-gris">${I.reloj}Desde el día 1</span>` : `<span class="pn-chip pn-pend">${I.reloj}Pendiente</span>`}</span></span>
+            <span class="pn-cuota-dato">${chipEstado(c)}</span></span>
             <span class="pn-cuota-acc">${botonCuota(c)}</span></li>`).join('')}</ul>`
           : `<p class="pn-vacio">${datos.cuotas.length ? 'No hay cuotas con ese filtro.' : 'Todavía no hay cuotas cargadas en la planilla.'}</p>`}
       </section>`;
