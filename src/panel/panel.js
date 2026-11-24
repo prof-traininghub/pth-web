@@ -610,22 +610,18 @@
     const q = sinTildes(st.buscarDest);
     return `
       <div class="pn-elegidos">${v.dest.length ? v.dest.map(t => `<button type="button" class="pn-elegido" data-accion="dest" data-token="${esc(t)}" aria-label="Quitar ${esc(etiquetaDest(t))}">${esc(etiquetaDest(t))}<span aria-hidden="true">×</span></button>`).join('')
-        + '<button type="button" class="pn-link" data-accion="dest-limpiar">Quitar todos</button>' : '<span class="pn-chico">Tocá los días, horarios, cursos o alumnos que quieras. Pueden ser varios.</span>'}</div>
-      <details class="pn-grupo" open><summary>Por día y horario <span class="pn-chico">ideal para feriados</span></summary>
+        + '<button type="button" class="pn-link" data-accion="dest-limpiar">Quitar todos</button>' : '<span class="pn-chico">Elegí alumnos, días u horarios. Pueden ser varios.</span>'}</div>
+      <details class="pn-grupo"${q ? ' open' : ''}><summary>Alumnos</summary>
+        <label class="pn-buscar">${I.buscar}<input class="pn-input" type="search" id="buscar-dest" placeholder="Buscar alumno" aria-label="Buscar alumno" value="${esc(st.buscarDest)}" autocomplete="off"></label>
+        <div class="pn-opciones" id="av-alumnos">${opcionesAlumnos()}</div>
+      </details>
+      <details class="pn-grupo"><summary>Por día y horario <span class="pn-chico">ideal para feriados</span></summary>
         ${diasOrd.length ? diasOrd.map(d => {
           const todoElDia = sel.has(d);
           const hs = Array.from(dias.get(d).entries()).sort((x, y) => x[0].localeCompare(y[0]));
           return `<div class="pn-dia"><b>${esc(d)}</b><div class="pn-opciones">${chip(d, 'Todo el día')}
             ${hs.map(([h, x]) => chip(d + ' ' + h, h + ' · ' + x.alumnos.size, todoElDia ? ' disabled title="Ya está todo el día"' : ` title="${esc(Array.from(x.cursos).join(', '))}"`)).join('')}</div></div>`;
         }).join('') : '<p class="pn-chico">No hay días y horarios cargados en Alumnos.</p>'}
-      </details>
-      <details class="pn-grupo"><summary>Por curso</summary>
-        <div class="pn-opciones">${listaCursos().map(c => chip(c, c)).join('')}</div>
-        ${listaCursoNivel().length ? `<div class="pn-opciones">${listaCursoNivel().map(c => chip(c, c)).join('')}</div>` : ''}
-      </details>
-      <details class="pn-grupo"${q ? ' open' : ''}><summary>Alumnos</summary>
-        <label class="pn-buscar">${I.buscar}<input class="pn-input" type="search" id="buscar-dest" placeholder="Buscar alumno" aria-label="Buscar alumno" value="${esc(st.buscarDest)}" autocomplete="off"></label>
-        <div class="pn-opciones" id="av-alumnos">${opcionesAlumnos()}</div>
       </details>`;
   }
   function opcionesAlumnos() {

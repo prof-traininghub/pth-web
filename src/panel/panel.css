@@ -253,10 +253,15 @@ svg { stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round
 .pn-elegido { display: inline-flex; align-items: center; gap: 6px; background: var(--negro); color: var(--on-negro); border: 0; border-radius: 999px;
   padding: 5px 8px 5px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .pn-elegido span { color: var(--amarillo); font-size: 17px; line-height: 1; }
-.pn-grupo { border: 1px solid var(--linea); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
-.pn-grupo summary { cursor: pointer; font-weight: 700; font-size: 15px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.pn-grupo[open] { gap: 10px; }
-.pn-grupo[open] > *:not(summary) { margin-top: 10px; }
+.pn-grupo { border: 1px solid var(--linea); border-radius: 10px; padding: 0 12px; display: block; }
+.pn-grupo summary { cursor: pointer; font-weight: 700; font-size: 15px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;
+  list-style: none; padding: 12px 22px 12px 0; position: relative; }
+.pn-grupo summary::-webkit-details-marker { display: none; }
+.pn-grupo summary::after { content: ""; position: absolute; right: 2px; top: 50%; width: 8px; height: 8px; margin-top: -6px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); transition: transform .15s; }
+.pn-grupo[open] summary::after { transform: rotate(-135deg); margin-top: -2px; }
+.pn-grupo[open] { padding-bottom: 12px; }
+.pn-grupo[open] > *:not(summary) + *:not(summary) { margin-top: 10px; }
 .pn-dia { display: grid; gap: 6px; }
 @media (min-width: 600px) { .pn-dia { grid-template-columns: 92px minmax(0, 1fr); align-items: start; } .pn-dia b { padding-top: 6px; } }
 .pn-dia b { font-size: 14.5px; }
