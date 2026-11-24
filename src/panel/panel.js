@@ -438,6 +438,9 @@
     return `<p class="pn-cuenta-n">${plural(lista.length, 'alumno')}</p><div class="pn-alumnos">${lista.map(fichaAlumno).join('')}</div>`;
   }
 
+  // Letra del módulo si en Programas tiene una («C»); si no, el número.
+  const etiquetaModulo = (c, n) => (c.etiquetas && c.etiquetas[n]) || String(n);
+
   function fichaAlumno(a) {
     const id = a.email || 'f' + a.filas[0];
     const abierto = st.abierto === id;
@@ -454,15 +457,17 @@
         ${a.cursos.map(c => {
           const pct = c.total ? Math.min(100, Math.round(Math.max(0, c.modulo - 1) * 100 / c.total)) : 0;
           const terminado = c.total && c.modulo > c.total;
+          const et = etiquetaModulo(c, c.modulo);
+          const nro = et !== String(c.modulo) ? ` (${c.modulo}${c.total ? ' de ' + c.total : ''})` : c.total ? ' de ' + c.total : '';
           return `
           <div class="pn-curso">
             <span class="pn-curso-nom"><b>${esc(nombreCurso(c))}</b><span>${esc(horario(c))}</span></span>
-            <span class="pn-avance"><span>${terminado ? 'Nivel terminado' : c.modulo ? `Módulo ${c.modulo}${c.total ? ' de ' + c.total : ''} · ${pct}% del nivel` : 'Sin módulo cargado'}</span>
+            <span class="pn-avance"><span>${terminado ? 'Nivel terminado' : c.modulo ? `Módulo ${esc(et)}${nro} · ${pct}% del nivel` : 'Sin módulo cargado'}</span>
               <span class="pn-barra" aria-hidden="true"><span style="width:${pct}%"></span></span></span>
             <span class="pn-paso" role="group" aria-label="Módulo actual de ${esc(a.nombre)} en ${esc(c.curso)}">
               <button type="button" data-accion="modulo" data-fila="${c.fila}" data-indice="${c.indice}" data-email="${esc(c.email)}" data-valor="${c.modulo - 1}"
                 aria-label="${c.modulo === 1 ? 'Volver a sin módulo' : 'Bajar un módulo'}"${c.modulo < 1 || !c.email ? ' disabled' : ''}>−</button>
-              <output>${terminado ? 'Terminado' : c.modulo ? 'Módulo ' + c.modulo : 'Sin módulo'}</output>
+              <output>${terminado ? 'Terminado' : c.modulo ? 'Módulo ' + esc(et) : 'Sin módulo'}</output>
               <button type="button" data-accion="modulo" data-fila="${c.fila}" data-indice="${c.indice}" data-email="${esc(c.email)}" data-valor="${(c.modulo || 0) + 1}"
                 aria-label="${c.total && c.modulo === c.total ? 'Marcar el nivel como terminado' : 'Pasar al módulo siguiente'}"${!c.email || terminado ? ' disabled' : ''}>+</button>
             </span>
@@ -748,11 +753,18 @@
   }
 
   /* ---------- acciones ---------- */
+  let ultimoPedido = 0;
   async function accion(nombre, extra, cambioLocal, ok, deshacer) {
     const copia = JSON.stringify(datos);
+    const nro = ++ultimoPedido;
     if (cambioLocal) { cambioLocal(); mostrar(true); }
     try {
       const r = await api(nombre, extra);
+      // Si mientras tanto salió otro pedido, esta respuesta ya es vieja: no se dibuja encima.
+      if (nro !== ultimoPedido || Object.keys(pendientesModulo).length) {
+        if (!r.error && ok) aviso(typeof ok === 'function' ? ok() : ok, false, deshacer);
+        return !r.error;
+      }
       if (r.error === 'cambio') { aviso('La planilla cambió mientras tanto. Ya actualizamos los datos: probá de nuevo.', true); await cargar(true); mostrar(true); return false; }
       if (r.error === 'titulo') { aviso('Falta el título del aviso.', true); datos = JSON.parse(copia); mostrar(true); return false; }
       if (r.error === 'link') { aviso('El link tiene que empezar con https://', true); datos = JSON.parse(copia); mostrar(true); return false; }
@@ -805,13 +817,25 @@
     }
   });
 
+  // Tocar + o − varias veces seguidas: se ve al instante y se guarda una sola vez, con el valor final.
+  const pendientesModulo = {};
   function cambiarModulo(fila, indice, email, valor) {
-    const f = datos.alumnos.find(x => x.fila === fila);
-    const antes = f && f.cursos[indice] ? f.cursos[indice].modulo : 0;
-    accion('panel-modulo', { fila, indice, email, valor }, () => {
-      const g = datos.alumnos.find(x => x.fila === fila);
-      if (g && g.cursos[indice]) g.cursos[indice].modulo = valor;
-    }, valor ? 'Módulo ' + valor + ' guardado.' : 'Quedó sin módulo.', () => cambiarModulo(fila, indice, email, antes));
+    const k = fila + ':' + indice;
+    const g = datos.alumnos.find(x => x.fila === fila);
+    const c = g && g.cursos[indice];
+    if (!c) return;
+    if (!pendientesModulo[k]) pendientesModulo[k] = { antes: c.modulo };
+    c.modulo = valor;
+    mostrar(true);
+    clearTimeout(pendientesModulo[k].timer);
+    pendientesModulo[k].timer = setTimeout(() => {
+      const antes = pendientesModulo[k].antes;
+      delete pendientesModulo[k];
+      if (antes === valor) return;
+      accion('panel-modulo', { fila, indice, email, valor }, null,
+        valor ? 'Módulo ' + etiquetaModulo(c, valor) + ' guardado.' : 'Quedó sin módulo.',
+        () => cambiarModulo(fila, indice, email, antes));
+    }, 700);
   }
 
   function cambiarCuota(fila, email, mes, estado) {

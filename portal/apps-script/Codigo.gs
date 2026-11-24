@@ -333,7 +333,7 @@ function cursosDeFila(a) {
   const niveles = partes(a['Nivel']), modulos = partes(a['Módulo actual']);
   const elegir = (lista, i) => (lista.length === cursos.length ? lista[i] : lista[0]) || '';
   return cursos.map((curso, i) => ({
-    curso: curso, nivel: elegir(niveles, i), moduloActual: Number(elegir(modulos, i)) || 0,
+    curso: curso, nivel: elegir(niveles, i), moduloActual: Number(elegir(modulos, i)) || 0, moduloTexto: elegir(modulos, i),
     dia: texto(a['Día']), horaInicio: hora(a['Hora inicio']), horaFin: hora(a['Hora fin']),
     meet: texto(a['Link de Meet']), classroom: texto(a['Link de Classroom'])
   }));
@@ -350,11 +350,22 @@ function numeroModulo(v) {
   return m ? Number(m[0]) : 0;
 }
 
+// «Módulo actual» puede ser el número (3) o el nombre del módulo como está en Programas (por ejemplo, la letra «C»).
+function moduloDe(c, filasPrograma) {
+  if (c.moduloActual) return c.moduloActual;
+  const t = sinTildes(c.moduloTexto || '').replace(/^(modulo|module)\s*/, '');
+  if (!t) return 0;
+  const p = filasPrograma.find(x => sinTildes(x['Módulo']).replace(/^(modulo|module)\s*/, '') === t);
+  if (p) return numeroModulo(p['Módulo N°']);
+  return /^[a-z]$/.test(t) ? t.charCodeAt(0) - 96 : 0;   // A = 1, B = 2…
+}
+
 // Programa y avance de un curso.
 function armarCurso(c) {
-  const actual = c.moduloActual;
-  const programa = filas('programas')
-    .filter(p => igual(p['Curso'], c.curso) && (!texto(p['Nivel']) || igual(p['Nivel'], c.nivel)))
+  const filasPrograma = filas('programas')
+    .filter(p => igual(p['Curso'], c.curso) && (!texto(p['Nivel']) || igual(p['Nivel'], c.nivel)));
+  const actual = moduloDe(c, filasPrograma);
+  const programa = filasPrograma
     .map(p => {
       const n = numeroModulo(p['Módulo N°']);
       return {
@@ -374,7 +385,10 @@ function armarCurso(c) {
   const nivelCfg = filas('niveles').find(n => igual(n['Curso'], c.curso) && igual(n['Nivel'], c.nivel));
   const total = Math.max(Number(nivelCfg && nivelCfg['Total de módulos']) || 0, programa.length);
   const avance = { completados: actual ? Math.max(0, Math.min(actual - 1, total)) : 0, total: total };
-  return Object.assign({}, c, { programa: programa, avance: avance });
+  const enCurso = programa.find(p => p.n === actual);
+  // Cómo se muestra el módulo: la letra o nombre corto de Programas si lo tiene («C»); si no, el número.
+  const etiqueta = !actual ? '' : enCurso && enCurso.nombre && enCurso.nombre.length <= 3 ? enCurso.nombre : String(actual);
+  return Object.assign({}, c, { moduloActual: actual, moduloEtiqueta: etiqueta, programa: programa, avance: avance });
 }
 
 function datosDelAlumno(a, usuario) {
@@ -694,7 +708,7 @@ function panel(pedido, usuario, sesion) {
   if (pedido.accion !== 'panel') {
     const lock = LockService.getScriptLock();
     lock.waitLock(15000);
-    try { problema = accion(); } finally { lock.releaseLock(); }
+    try { problema = accion(); SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
     if (!problema) datosCambiaron();
     Object.keys(_filas).forEach(k => delete _filas[k]);   // releer lo que se acaba de escribir
     Object.keys(_crudo).forEach(k => delete _crudo[k]);
@@ -726,7 +740,9 @@ function datosPanel(usuario) {
       activo: !/^no$/i.test(texto(a['Activo'])),
       cursos: cursosDeFila(a).map(c => {
         const k = armarCurso(c);
-        return { curso: c.curso, nivel: c.nivel, modulo: c.moduloActual, total: k.avance.total,
+        return { curso: c.curso, nivel: c.nivel, modulo: k.moduloActual, etiqueta: k.moduloEtiqueta,
+                 etiquetas: k.programa.reduce((o, p) => { if (p.nombre && p.nombre.length <= 3) o[p.n] = p.nombre; return o; }, {}),
+                 total: k.avance.total,
                  programa: k.programa.length, dia: c.dia, horaInicio: c.horaInicio, horaFin: c.horaFin,
                  meet: c.meet, classroom: c.classroom };
       }),
@@ -826,11 +842,17 @@ function panelModulo(p) {
   const h = hoja('alumnos');
   const cursos = partes(h.getRange(fila, columna('alumnos', 'Curso')).getValue()).filter(Boolean);
   const celda = h.getRange(fila, columna('alumnos', 'Módulo actual'));
-  if (cursos.length <= 1) { if (valor) celda.setValue(valor); else celda.clearContent(); return null; }
+  const i = Math.max(0, Math.min(cursos.length - 1, Number(p.indice) || 0));
+  // Si en Programas los módulos tienen letra («A», «B»…), se escribe la letra, como lo cargan ellas.
+  precargar(['alumnos', 'programas', 'niveles']);
+  const filaObj = filas('alumnos').find(x => x._fila === fila);
+  const curso = filaObj ? armarCurso(cursosDeFila(filaObj)[i] || cursosDeFila(filaObj)[0]) : null;
+  const mod = curso && curso.programa.find(x => x.n === valor);
+  const escribir = !valor ? '' : mod && mod.nombre && mod.nombre.length <= 3 ? mod.nombre : valor;
+  if (cursos.length <= 1) { if (escribir !== '') celda.setValue(escribir); else celda.clearContent(); return null; }
   let mods = partes(celda.getValue());
   if (mods.length !== cursos.length) mods = cursos.map(() => mods[0] || '');
-  const i = Math.max(0, Math.min(cursos.length - 1, Number(p.indice) || 0));
-  mods[i] = String(valor);
+  mods[i] = String(escribir || '0');
   celda.setNumberFormat('@').setValue(mods.join(' + '));
   return null;
 }
