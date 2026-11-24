@@ -139,7 +139,7 @@ function leerSesion(s) {
 function versionDatos() { return PropertiesService.getScriptProperties().getProperty('VERSION_DATOS') || '0'; }
 // La caché cambia con cada edición de la planilla y también cada día (cuotas vencidas, mes que empieza).
 // VERSION_CODIGO: subirlo cuando cambia cómo se arman los datos, así no se sirve nada armado con el código anterior.
-const VERSION_CODIGO = '2';
+const VERSION_CODIGO = '3';
 function claveVersion() { return VERSION_CODIGO + ':' + versionDatos() + ':' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd'); }
 function comprimir(obj) { return Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(obj), 'application/json')).getBytes()); }
 function descomprimir(z) {
@@ -205,6 +205,49 @@ function deSerie(n) {
   return Utilities.parseDate(Utilities.formatDate(utc, 'UTC', 'yyyy-MM-dd HH:mm:ss'), ZONA, 'yyyy-MM-dd HH:mm:ss');
 }
 
+// Links que no son texto: chips de Drive (archivo insertado), texto con link o link de toda la celda.
+// Se leen con un pedido aparte, solo en las pestañas donde se cargan links.
+const PESTANAS_CON_LINKS = ['programas', 'alumnos'];
+const _links = {};
+function leerLinks() {
+  const faltan = PESTANAS_CON_LINKS.filter(k => !_links[k]);
+  if (!faltan.length) return;
+  faltan.forEach(k => { _links[k] = []; });
+  try {
+    const r = Sheets.Spreadsheets.get(PLANILLA_ID, {
+      ranges: faltan.map(k => "'" + NOMBRES[k] + "'"),
+      fields: 'sheets(properties.title,data.rowData.values(hyperlink,chipRuns(startIndex,chip.richLinkProperties.uri),textFormatRuns(startIndex,format.link.uri)))'
+    });
+    (r.sheets || []).forEach(h => {
+      const k = faltan.find(x => NOMBRES[x] === h.properties.title);
+      if (!k) return;
+      _links[k] = ((h.data && h.data[0] && h.data[0].rowData) || []).map(f => (f.values || []).map(c => {
+        const l = [];
+        (c.chipRuns || []).forEach(x => { if (x.chip && x.chip.richLinkProperties) l.push({ i: x.startIndex || 0, uri: x.chip.richLinkProperties.uri }); });
+        (c.textFormatRuns || []).forEach(x => { if (x.format && x.format.link && x.format.link.uri) l.push({ i: x.startIndex || 0, uri: x.format.link.uri }); });
+        if (!l.length && c.hyperlink) l.push({ i: 0, uri: c.hyperlink });
+        return l;
+      }));
+    });
+  } catch (e) { console.warn('links: ' + e.message); }
+}
+// Bibliografía: cada renglón con su link («Texto | link»). Columnas de link: si el texto no es un link, se usa el insertado.
+function conLinks(valor, links, encabezado) {
+  if (!links || !links.length) return valor;
+  const t = String(valor == null ? '' : valor);
+  if (encabezado === 'Bibliografía') {
+    let pos = 0;
+    return t.split('\n').map(linea => {
+      const desde = pos, hasta = pos + linea.length;
+      pos = hasta + 1;
+      if (linea.indexOf('|') >= 0 || !linea.trim()) return linea;
+      const l = links.find(x => x.i >= desde && x.i <= hasta);
+      return l ? linea + ' | ' + l.uri : linea;
+    }).join('\n');
+  }
+  return /^https?:\/\//i.test(t.trim()) ? t : links[0].uri;
+}
+
 const _filas = {};
 function filas(clave) {
   if (_filas[clave]) return _filas[clave];
@@ -225,6 +268,11 @@ function filas(clave) {
   }
   valores = valores.slice();
   if (valores.length < 2) return (_filas[clave] = []);
+  if (_crudo[clave] && PESTANAS_CON_LINKS.indexOf(clave) >= 0) {
+    leerLinks();
+    const lk = _links[clave] || [];
+    valores = valores.map((f, n) => (lk[n] || []).some(x => x.length) ? f.map((v, i) => conLinks(v, lk[n][i], String(valores[0][i]))) : f);
+  }
   const encabezados = valores.shift().map(String);
   // _fila: número de fila en la planilla (lo usa el panel para escribir en el lugar justo).
   return (_filas[clave] = valores
@@ -717,6 +765,7 @@ function panel(pedido, usuario, sesion) {
     if (!problema) datosCambiaron();
     Object.keys(_filas).forEach(k => delete _filas[k]);   // releer lo que se acaba de escribir
     Object.keys(_crudo).forEach(k => delete _crudo[k]);
+    Object.keys(_links).forEach(k => delete _links[k]);
   }
   if (problema && problema.error) return problema;
   if (pedido.accion === 'panel-aviso' && !pedido.cuando) enviarAvisos();   // sale ya, sin esperar el ciclo de 5 min
