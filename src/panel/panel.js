@@ -16,7 +16,7 @@
   const st = {
     buscar: '', curso: '', inactivos: false, abierto: null,
     mes: null, filtro: 'pendientes', buscarCuota: '',
-    aviso: { para: 'Todos', titulo: '', mensaje: '', link: '', programar: false, cuando: '' },
+    aviso: { todos: true, dest: [], para: 'Todos', titulo: '', mensaje: '', link: '', programar: false, cuando: '' }, buscarDest: '',
     confirmar: false, enviando: false, docente: '', buscarDev: ''
   };
 
@@ -117,22 +117,28 @@
   const listaCursoNivel = () => Array.from(new Set(datos.alumnos.flatMap(a => a.cursos.filter(c => c.curso && c.nivel).map(c => c.curso + ' · ' + c.nivel)))).sort();
   const estaPagada = c => /pagad/i.test(c.estado);
 
-  // Mismo criterio que el script: «Todos», un curso, «Curso · Nivel», un nivel o mails.
+  // Mismo criterio que el script: «Todos», un curso, «Curso · Nivel», un nivel, un día («Lunes»),
+  // un día y horario («Lunes 19:00») o mails; varios separados por coma.
+  const DIA_HORA = /^([a-záéíóúü]+)\s+(\d{1,2}:\d{2})$/i;
+  function coincide(p, a) {
+    const q = sinTildes(p);
+    if (p.indexOf('@') > 0) return q === a.email;
+    const dh = p.match(DIA_HORA);
+    return a.cursos.some(k => {
+      if (dh) return sinTildes(k.dia) === sinTildes(dh[1]) && k.horaInicio === dh[2].padStart(5, '0');
+      const curso = sinTildes(k.curso), nivel = sinTildes(k.nivel);
+      if (q.indexOf('·') > 0) { const [c, n] = q.split('·').map(x => x.trim()); return c === curso && n === nivel; }
+      return q === curso || q === nivel || q === sinTildes(k.dia);
+    });
+  }
   function alcance(para) {
     const lista = activos();
     let elegidos;
-    if (!para || /^todos$/i.test(para)) elegidos = lista;
+    if (para === '') elegidos = [];
+    else if (!para || /^todos$/i.test(para)) elegidos = lista;
     else {
       const partes = para.split(/[,;\n]+/).map(p => p.trim()).filter(Boolean);
-      elegidos = lista.filter(a => partes.some(p => {
-        const q = sinTildes(p);
-        if (p.indexOf('@') > 0) return q === a.email;
-        return a.cursos.some(k => {
-          const curso = sinTildes(k.curso), nivel = sinTildes(k.nivel);
-          if (q.indexOf('·') > 0) { const [c, n] = q.split('·').map(x => x.trim()); return c === curso && n === nivel; }
-          return q === curso || q === nivel;
-        });
-      }));
+      elegidos = lista.filter(a => partes.some(p => coincide(p, a)));
     }
     return { total: elegidos.length, conApp: elegidos.filter(a => a.app && a.novedades).length };
   }
@@ -534,19 +540,18 @@
   /* ---------- Avisos ---------- */
   function vAvisos() {
     const v = st.aviso;
-    const opciones = (lista, sel) => lista.map(o => `<option value="${esc(o[0])}"${o[0] === sel ? ' selected' : ''}>${esc(o[1])}</option>`).join('');
     return `
       <header class="pn-cab"><div><p class="pn-eyebrow">Avisos</p><h1 class="pn-h1">Mandá una notificación al celular</h1>
         <p class="pn-lead">Les llega a los alumnos que tienen la app con los avisos activados. Para todo lo demás, sigue estando WhatsApp.</p></div></header>
       <div class="pn-grid pn-grid-3-1">
         <section class="pn-card">
-          <label class="pn-campo"><span>Para</span>
-            <select class="pn-select" id="av-para" style="width:100%">
-              <option value="Todos"${v.para === 'Todos' ? ' selected' : ''}>Todos los alumnos</option>
-              <optgroup label="Un curso">${opciones(listaCursos().map(c => [c, c]), v.para)}</optgroup>
-              <optgroup label="Un curso y nivel">${opciones(listaCursoNivel().map(c => [c, c]), v.para)}</optgroup>
-              <optgroup label="Un alumno">${opciones(activos().filter(a => a.email).map(a => [a.email, a.nombre]), v.para)}</optgroup>
-            </select></label>
+          <div class="pn-campo"><span>Para</span>
+            <div class="pn-seg" role="group" aria-label="Destinatarios">
+              <button type="button" data-accion="dest-todos" data-valor="1" aria-pressed="${v.todos}">Todos los alumnos</button>
+              <button type="button" data-accion="dest-todos" data-valor="0" aria-pressed="${!v.todos}">Elegir</button>
+            </div>
+            <div id="av-dest">${v.todos ? '' : selectorDestinos()}</div>
+          </div>
           <label class="pn-campo"><span>Título</span>
             <input class="pn-input" id="av-titulo" maxlength="80" value="${esc(v.titulo)}" placeholder="Ej.: Seminario con Debs" autocomplete="off">
             <small>Corto: es lo primero que se lee.</small></label>
@@ -573,10 +578,75 @@
           : '<p class="pn-vacio">Todavía no mandaron avisos.</p>'}
       </section>`;
   }
+  // Nombre legible de un destinatario: mail → nombre del alumno; «Lunes» → «Todo el lunes».
+  function etiquetaDest(t) {
+    if (t.indexOf('@') > 0) { const a = datos.alumnos.find(x => x.email === t.toLowerCase()); return a ? a.nombre : t; }
+    if (DIAS.some(d => sinTildes(d) === sinTildes(t))) return 'Todo el ' + t.toLowerCase();
+    return t;
+  }
   function paraLegible(p) {
     if (!p || /^todos$/i.test(p)) return 'Todos';
-    const a = datos.alumnos.find(x => x.email === p.toLowerCase());
-    return a ? a.nombre : p;
+    const ts = p.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean).map(etiquetaDest);
+    return ts.length > 4 ? ts.slice(0, 4).join(', ') + ' y ' + (ts.length - 4) + ' más' : ts.join(', ');
+  }
+  const ORDEN_DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
+
+  // Selector de varios destinatarios: por día, por día y horario, por curso o alumno por alumno.
+  function selectorDestinos() {
+    const v = st.aviso, sel = new Set(v.dest);
+    const chip = (token, texto, extra) => `<button type="button" class="pn-opcion" data-accion="dest" data-token="${esc(token)}" aria-pressed="${sel.has(token)}"${extra || ''}>${esc(texto)}</button>`;
+    // Clases agrupadas por día y horario
+    const dias = new Map();
+    activos().forEach(a => a.cursos.forEach(c => {
+      if (!c.activo || !c.dia || !c.horaInicio) return;
+      const d = cap(c.dia.trim());
+      if (!dias.has(d)) dias.set(d, new Map());
+      const hs = dias.get(d);
+      if (!hs.has(c.horaInicio)) hs.set(c.horaInicio, { alumnos: new Set(), cursos: new Set() });
+      hs.get(c.horaInicio).alumnos.add(a.email || a.nombre);
+      hs.get(c.horaInicio).cursos.add(c.curso);
+    }));
+    const diasOrd = Array.from(dias.keys()).sort((x, y) => ORDEN_DIAS.indexOf(sinTildes(x)) - ORDEN_DIAS.indexOf(sinTildes(y)));
+    const q = sinTildes(st.buscarDest);
+    return `
+      <div class="pn-elegidos">${v.dest.length ? v.dest.map(t => `<button type="button" class="pn-elegido" data-accion="dest" data-token="${esc(t)}" aria-label="Quitar ${esc(etiquetaDest(t))}">${esc(etiquetaDest(t))}<span aria-hidden="true">×</span></button>`).join('')
+        + '<button type="button" class="pn-link" data-accion="dest-limpiar">Quitar todos</button>' : '<span class="pn-chico">Tocá los días, horarios, cursos o alumnos que quieras. Pueden ser varios.</span>'}</div>
+      <details class="pn-grupo" open><summary>Por día y horario <span class="pn-chico">ideal para feriados</span></summary>
+        ${diasOrd.length ? diasOrd.map(d => {
+          const todoElDia = sel.has(d);
+          const hs = Array.from(dias.get(d).entries()).sort((x, y) => x[0].localeCompare(y[0]));
+          return `<div class="pn-dia"><b>${esc(d)}</b><div class="pn-opciones">${chip(d, 'Todo el día')}
+            ${hs.map(([h, x]) => chip(d + ' ' + h, h + ' · ' + x.alumnos.size, todoElDia ? ' disabled title="Ya está todo el día"' : ` title="${esc(Array.from(x.cursos).join(', '))}"`)).join('')}</div></div>`;
+        }).join('') : '<p class="pn-chico">No hay días y horarios cargados en Alumnos.</p>'}
+      </details>
+      <details class="pn-grupo"><summary>Por curso</summary>
+        <div class="pn-opciones">${listaCursos().map(c => chip(c, c)).join('')}</div>
+        ${listaCursoNivel().length ? `<div class="pn-opciones">${listaCursoNivel().map(c => chip(c, c)).join('')}</div>` : ''}
+      </details>
+      <details class="pn-grupo"${q ? ' open' : ''}><summary>Alumnos</summary>
+        <label class="pn-buscar">${I.buscar}<input class="pn-input" type="search" id="buscar-dest" placeholder="Buscar alumno" aria-label="Buscar alumno" value="${esc(st.buscarDest)}" autocomplete="off"></label>
+        <div class="pn-opciones" id="av-alumnos">${opcionesAlumnos()}</div>
+      </details>`;
+  }
+  function opcionesAlumnos() {
+    const sel = new Set(st.aviso.dest), q = sinTildes(st.buscarDest);
+    const lista = activos().filter(a => a.email && (!q || sinTildes(a.nombre).indexOf(q) >= 0));
+    return lista.length ? lista.map(a => `<button type="button" class="pn-opcion" data-accion="dest" data-token="${esc(a.email)}" aria-pressed="${sel.has(a.email)}">${esc(a.nombre)}</button>`).join('')
+      : '<span class="pn-chico">Ningún alumno con ese nombre.</span>';
+  }
+  function actualizarDestinos(redibujar) {
+    const v = st.aviso;
+    v.para = v.todos ? 'Todos' : v.dest.join(', ');
+    st.confirmar = false;
+    if (redibujar) {
+      const y = window.scrollY;
+      const abiertos = Array.from(document.querySelectorAll('#av-dest details')).map(d => d.open);
+      pintar('av-dest', v.todos ? '' : selectorDestinos());
+      document.querySelectorAll('#av-dest details').forEach((d, i) => { if (abiertos[i] !== undefined) d.open = abiertos[i]; });
+      document.querySelectorAll('[data-accion="dest-todos"]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.valor === '1') === v.todos)));
+      window.scrollTo(0, y);
+    }
+    pintar('av-preview', previewAviso()); pintar('av-botones', botonesAviso());
   }
   function botonesAviso() {
     const v = st.aviso, n = alcance(v.para);
@@ -584,6 +654,8 @@
     if (st.confirmar) return `
       <button class="pn-btn pn-btn-amarillo" type="button" data-accion="aviso-enviar">${I.enviar}${v.programar ? 'Sí, programarlo' : `Sí, enviar a ${plural(n.conApp, 'alumno')}`}</button>
       <button class="pn-link" type="button" data-accion="aviso-cancelar">Cancelar</button>`;
+    if (!v.todos && !v.dest.length) return `<button class="pn-btn pn-btn-negro" type="button" disabled>${I.enviar}Enviar aviso</button>
+      <span class="pn-chico">Elegí a quién mandarlo.</span>`;
     if (!v.programar && !n.conApp) return `<button class="pn-btn pn-btn-negro" type="button" disabled>${I.enviar}Enviar aviso</button>
       <span class="pn-chico">Ninguno de los elegidos tiene la app con avisos todavía.</span>`;
     return `<button class="pn-btn pn-btn-negro" type="button" data-accion="aviso-confirmar"${!v.titulo.trim() ? ' disabled' : ''}>${I.enviar}${v.programar ? 'Programar aviso' : 'Enviar aviso'}</button>`;
@@ -706,6 +778,19 @@
         cambiarModulo(fila, indice, d.email, valor);
         break;
       }
+      case 'dest-todos': st.aviso.todos = d.valor === '1'; actualizarDestinos(true); break;
+      case 'dest-limpiar': st.aviso.dest = []; actualizarDestinos(true); break;
+      case 'dest': {
+        const v = st.aviso, i = v.dest.indexOf(d.token);
+        if (i >= 0) v.dest.splice(i, 1);
+        else {
+          v.dest.push(d.token);
+          // Si eligen todo el día, sobran los horarios sueltos de ese día.
+          if (DIAS.some(x => sinTildes(x) === sinTildes(d.token))) v.dest = v.dest.filter(t => !(DIA_HORA.test(t) && sinTildes(t.split(' ')[0]) === sinTildes(d.token)));
+        }
+        actualizarDestinos(true);
+        break;
+      }
       case 'aviso-confirmar': if (st.aviso.titulo.trim()) { st.confirmar = true; pintar('av-botones', botonesAviso()); } break;
       case 'aviso-cancelar': st.confirmar = false; pintar('av-botones', botonesAviso()); break;
       case 'aviso-enviar': enviarAviso(); break;
@@ -744,7 +829,7 @@
       return v.programar ? 'Aviso programado.' : a && a.estado ? a.estado + '.' : 'Aviso en camino: sale en los próximos minutos.';
     });
     st.enviando = false;
-    if (ok) st.aviso = { para: 'Todos', titulo: '', mensaje: '', link: '', programar: false, cuando: '' };
+    if (ok) st.aviso = { todos: true, dest: [], para: 'Todos', titulo: '', mensaje: '', link: '', programar: false, cuando: '' }; st.buscarDest = '';
     mostrar(true);
   }
 
@@ -774,6 +859,7 @@
       case 'buscar-alumno': st.buscar = t.value; refrescarResultados(); break;
       case 'buscar-cuota': st.buscarCuota = t.value; refrescarResultados(); break;
       case 'buscar-dev': st.buscarDev = t.value; refrescarResultados(); break;
+      case 'buscar-dest': st.buscarDest = t.value; pintar('av-alumnos', opcionesAlumnos()); break;
       case 'av-titulo': v.titulo = t.value; st.confirmar = false; pintar('av-preview', previewAviso()); pintar('av-botones', botonesAviso()); break;
       case 'av-mensaje': v.mensaje = t.value; pintar('av-preview', previewAviso()); break;
       case 'av-link': v.link = t.value; break;
@@ -787,7 +873,6 @@
       case 'ver-inactivos': st.inactivos = t.checked; refrescarResultados(); break;
       case 'filtro-mes': st.mes = t.value; refrescarResultados(); break;
       case 'filtro-docente': st.docente = t.value; refrescarResultados(); break;
-      case 'av-para': st.aviso.para = t.value; st.confirmar = false; pintar('av-preview', previewAviso()); pintar('av-botones', botonesAviso()); break;
       case 'av-programar': st.aviso.programar = t.checked; st.confirmar = false; mostrar(true); break;
     }
   });

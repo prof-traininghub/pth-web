@@ -571,7 +571,8 @@ function avisosManuales(subs, activos) {
   if (cambio) datosCambiaron();
 }
 
-// «Todos» (o vacío), un curso, «Curso · Nivel», un nivel o mails; varios separados por coma.
+// «Todos» (o vacío), un curso, «Curso · Nivel», un nivel, un día («Lunes»), un día y horario («Lunes 19:00»)
+// o mails; varios separados por coma.
 function destinatarios(para, activos) {
   const mail = a => texto(a['Mail de Google']).toLowerCase();
   if (!para || /^todos$/i.test(para)) return activos.map(mail);
@@ -579,10 +580,12 @@ function destinatarios(para, activos) {
   return activos.filter(a => partes.some(p => {
     const q = sinTildes(p);
     if (p.indexOf('@') > 0) return q === mail(a);
+    const dh = p.match(/^([a-záéíóúü]+)\s+(\d{1,2}:\d{2})$/i);
     return cursosDeFila(a).some(k => {
+      if (dh) return sinTildes(k.dia) === sinTildes(dh[1]) && k.horaInicio === hora(dh[2]);
       const curso = sinTildes(k.curso), nivel = sinTildes(k.nivel);
       if (q.indexOf('·') > 0) { const [c, n] = q.split('·').map(x => x.trim()); return c === curso && n === nivel; }
-      return q === curso || q === nivel;
+      return q === curso || q === nivel || q === sinTildes(k.dia);
     });
   })).map(mail);
 }
@@ -823,7 +826,7 @@ function panelAviso(p) {
   let cuando = '';
   const m = String(p.cuando || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
   if (m) cuando = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]));
-  hoja('avisos').appendRow([cuando, corto(p.para, 500) || 'Todos', titulo, mensaje, link, '']);
+  hoja('avisos').appendRow([cuando, corto(p.para, 5000) || 'Todos', titulo, mensaje, link, '']);
   SpreadsheetApp.flush();
   return null;
 }
