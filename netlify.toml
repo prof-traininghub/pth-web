@@ -2,6 +2,10 @@
   command = "python3 build.py"
   publish = "dist"
 
+# La apiKey de Firebase del portal es pública por diseño (va en el navegador): no es un secreto.
+[build.environment]
+  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "AIzaSyAHsllyFpBUZt4hlN-qEPcZ4hXaqfVHBQE"
+
 [[headers]]
   for = "/*"
   [headers.values]
