@@ -142,9 +142,18 @@
     try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp * 1000 > Date.now() + 60000; }
     catch (e) { return false; }
   }
+  // El botón de Google se carga solo si hace falta entrar (con sesión guardada no se descarga).
+  let gsiPedido = false;
+  function cargarGoogle() {
+    if (gsiPedido) return;
+    gsiPedido = true;
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    document.head.appendChild(sc);
+  }
   let googleListo = false;
   function conGoogle(fn) {
-    if (!window.google || !google.accounts || !google.accounts.id) { setTimeout(() => conGoogle(fn), 120); return; }
+    if (!window.google || !google.accounts || !google.accounts.id) { cargarGoogle(); setTimeout(() => conGoogle(fn), 120); return; }
     if (!googleListo) {
       google.accounts.id.initialize({
         client_id: CFG.clientId,
@@ -785,4 +794,5 @@
 
   if (!CFG.api || CFG.api.indexOf('{{') === 0) { vista.innerHTML = '<p class="pn-cargando">Panel en preparación.</p>'; return; }
   iniciar();
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();

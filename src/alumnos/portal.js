@@ -86,9 +86,18 @@
   }
 
   // Espera a que cargue el botón de Google (solo hace falta para entrar).
+  // El botón de Google se carga solo si hace falta entrar (con sesión guardada no se descarga).
+  let gsiPedido = false;
+  function cargarGoogle() {
+    if (gsiPedido) return;
+    gsiPedido = true;
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    document.head.appendChild(sc);
+  }
   let googleListo = false;
   function conGoogle(fn) {
-    if (!window.google || !google.accounts || !google.accounts.id) { setTimeout(() => conGoogle(fn), 120); return; }
+    if (!window.google || !google.accounts || !google.accounts.id) { cargarGoogle(); setTimeout(() => conGoogle(fn), 120); return; }
     if (!googleListo) {
       google.accounts.id.initialize({
         client_id: CFG.clientId,
@@ -759,4 +768,5 @@
   }
 
   iniciar();
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();

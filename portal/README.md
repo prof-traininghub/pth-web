@@ -60,3 +60,15 @@ siguen haciendo en la planilla.
 
 Archivos: `src/panel/` (frontend) y la sección «Panel de PTH» de `Codigo.gs` (acciones `panel`, `panel-cuota`,
 `panel-modulo`, `panel-aviso`, `panel-mensaje`).
+
+## Velocidad (24/11/2026)
+
+- El script lee todas las pestañas en un solo pedido a la API de Sheets (servicio avanzado «Sheets», con la API
+  habilitada en el proyecto de Cloud portal-alumno-pth): de ~4,2 s a ~0,3–0,8 s.
+- Los datos del panel y de cada alumno se guardan comprimidos en CacheService con la clave «versión de la planilla +
+  día». El activador de 5 minutos (`enviarAvisos`) los precalienta cuando cambió la planilla o el día, así casi todos
+  los pedidos salen de la caché.
+- `actualizarFormulario` solo abre el formulario si cambiaron los alumnos o las docentes.
+- Portal y panel: el botón de Google se descarga solo si hace falta entrar, preconexión a la API y service worker que
+  abre al instante con lo guardado y se actualiza en segundo plano.
+- `medirTiempos()` en el editor muestra cuánto tarda cada parte.
