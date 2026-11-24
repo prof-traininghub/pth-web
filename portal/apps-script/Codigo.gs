@@ -179,7 +179,7 @@ function hoja(clave) {
 }
 
 // Lee varias pestañas en UN solo pedido a la API de Sheets (leerlas una por una tarda ~0,4 s cada una).
-// Las fechas llegan como texto con el formato de la celda; si la API falla, filas() lee pestaña por pestaña.
+// Las fechas llegan como número de serie y se pasan a Date (igual que antes); si la API falla, filas() lee pestaña por pestaña.
 const _crudo = {};
 function precargar(claves) {
   claves = (claves || Object.keys(NOMBRES)).filter(k => !_crudo[k] && !_filas[k]);
@@ -187,7 +187,7 @@ function precargar(claves) {
   try {
     const r = Sheets.Spreadsheets.Values.batchGet(PLANILLA_ID, {
       ranges: claves.map(k => "'" + NOMBRES[k] + "'"),
-      valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'FORMATTED_STRING'
+      valueRenderOption: 'UNFORMATTED_VALUE', dateTimeRenderOption: 'SERIAL_NUMBER'
     });
     (r.valueRanges || []).forEach((vr, i) => { _crudo[claves[i]] = vr.values || []; });
   } catch (e) {
@@ -196,10 +196,26 @@ function precargar(claves) {
   }
 }
 
+// Columnas con fecha: el número de serie de Sheets (días desde 30/12/1899) se pasa a Date en la zona de PTH.
+const COLUMNAS_FECHA = ['Vence', 'Fecha de pago', 'Fecha', 'Fecha y hora', 'Marca temporal', 'Mes'];
+function deSerie(n) {
+  const utc = new Date(Math.round((n - 25569) * 86400000));
+  return Utilities.parseDate(Utilities.formatDate(utc, 'UTC', 'yyyy-MM-dd HH:mm:ss'), ZONA, 'yyyy-MM-dd HH:mm:ss');
+}
+
 const _filas = {};
 function filas(clave) {
   if (_filas[clave]) return _filas[clave];
   let valores = _crudo[clave];
+  if (valores && valores.length > 1) {
+    const enc = valores[0].map(String);
+    const cols = enc.map((e, i) => COLUMNAS_FECHA.indexOf(e) >= 0 || i === 0 && clave === 'devoluciones' ? i : -1).filter(i => i >= 0);
+    valores = [valores[0]].concat(valores.slice(1).map(f => {
+      const g = f.slice();
+      cols.forEach(i => { if (typeof g[i] === 'number' && g[i] > 20000) g[i] = deSerie(g[i]); });
+      return g;
+    }));
+  }
   if (!valores) {
     const h = hoja(clave);
     if (!h || h.getLastRow() < 2) return (_filas[clave] = []);
