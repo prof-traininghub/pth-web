@@ -326,11 +326,14 @@ function filasDelAlumno(email) {
 }
 
 function partes(v) { return texto(v).split(/\s*\+\s*/).map(x => x.trim()); }
+// Los niveles llevan «+» en el nombre («B1+/B2», «B1/B1+»): ahí el «+» separa solo si tiene espacios alrededor
+// («A1/A2 + B1/B2») o si lo sigue directamente otro nivel («A1/A2+B1/B2»).
+function partesNivel(v) { return texto(v).split(/\s+\+\s+|\+(?=[A-Za-z])/).map(x => x.trim()); }
 
 function cursosDeFila(a) {
   const cursos = partes(a['Curso']).filter(Boolean);
   if (!cursos.length) cursos.push('');
-  const niveles = partes(a['Nivel']), modulos = partes(a['Módulo actual']);
+  const niveles = partesNivel(a['Nivel']), modulos = partes(a['Módulo actual']);
   const elegir = (lista, i) => (lista.length === cursos.length ? lista[i] : lista[0]) || '';
   return cursos.map((curso, i) => ({
     curso: curso, nivel: elegir(niveles, i), moduloActual: Number(elegir(modulos, i)) || 0, moduloTexto: elegir(modulos, i),
