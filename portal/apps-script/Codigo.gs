@@ -138,7 +138,9 @@ function leerSesion(s) {
 // Cada cambio en la planilla invalida la caché de datos de todos los alumnos.
 function versionDatos() { return PropertiesService.getScriptProperties().getProperty('VERSION_DATOS') || '0'; }
 // La caché cambia con cada edición de la planilla y también cada día (cuotas vencidas, mes que empieza).
-function claveVersion() { return versionDatos() + ':' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd'); }
+// VERSION_CODIGO: subirlo cuando cambia cómo se arman los datos, así no se sirve nada armado con el código anterior.
+const VERSION_CODIGO = '2';
+function claveVersion() { return VERSION_CODIGO + ':' + versionDatos() + ':' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd'); }
 function comprimir(obj) { return Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(obj), 'application/json')).getBytes()); }
 function descomprimir(z) {
   if (!z) return null;
