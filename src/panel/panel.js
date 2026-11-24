@@ -377,15 +377,25 @@
   // Lo que falta completar en la planilla para que el portal se vea bien.
   function vPendientesDeCarga(lista) {
     const tareas = [];
-    const nombres = arr => arr.slice(0, 12).map(esc).join(', ') + (arr.length > 12 ? ` y ${arr.length - 12} más` : '');
+    const nombres = arr => arr.slice(0, 12).map(esc).join(arr.some(x => x.indexOf('(') > 0) ? '<br>' : ', ') + (arr.length > 12 ? ` y ${arr.length - 12} más` : '');
     const sinMail = datos.alumnos.filter(a => a.activo && !a.email).map(a => a.nombre || 'Fila ' + a.fila);
     if (sinMail.length) tareas.push(['sin mail de Google: no pueden entrar al portal', sinMail]);
     const sinNivel = lista.filter(a => a.cursos.some(c => !c.nivel)).map(a => a.nombre);
     if (sinNivel.length) tareas.push(['sin nivel: no ven su programa', sinNivel]);
     const sinDia = lista.filter(a => a.cursos.some(c => !c.dia || !c.horaInicio)).map(a => a.nombre);
     if (sinDia.length) tareas.push(['sin día u horario: no reciben el aviso de clase', sinDia]);
-    const sinPrograma = Array.from(new Set(lista.flatMap(a => a.cursos.filter(c => c.curso && c.nivel && !c.programa).map(nombreCurso))));
-    if (sinPrograma.length) tareas.push(['cursos sin módulos en Programas', sinPrograma]);
+    // Curso y nivel del alumno que no están en Programas, con los niveles que sí hay cargados para ese curso.
+    const enProgramas = datos.programas || [];
+    const sinPrograma = Array.from(new Set(lista.flatMap(a => a.cursos.filter(c => c.curso && c.nivel && !c.programa).map(nombreCurso)))).map(n => {
+      const curso = sinTildes(n.split(' · ')[0]);
+      const hay = enProgramas.filter(k => sinTildes(k.split(' · ')[0]) === curso).map(k => k.split(' · ')[1] || 'sin nivel');
+      return n + (hay.length ? ' (en Programas este curso tiene: ' + hay.join(', ') + ')' : ' (este curso no tiene módulos en Programas)');
+    });
+    if (sinPrograma.length) tareas.push(['cursos y niveles de alumnos que no coinciden con Programas', sinPrograma]);
+    const sinCurso = datos.alumnos.filter(a => a.activo && !a.cursos.some(c => c.curso)).map(a => a.nombre || 'Fila ' + a.fila);
+    if (sinCurso.length) tareas.push(['sin curso cargado', sinCurso]);
+    const sinModulo = lista.filter(a => a.cursos.some(c => c.curso && c.programa && !c.modulo)).map(a => a.nombre);
+    if (sinModulo.length) tareas.push(['sin módulo actual: la barra de avance queda en cero', sinModulo]);
     // Solo si ya empezaron a cargar las cuotas del mes: muestra a quién le falta.
     const conCuota = new Set(datos.cuotas.filter(esDelMes).map(c => c.email));
     const sinCuota = conCuota.size ? lista.filter(a => a.email && !conCuota.has(a.email)).map(a => a.nombre) : [];
@@ -396,7 +406,7 @@
         <div class="pn-card-cab"><h2 class="pn-h2">Para completar en la planilla</h2>
           ${datos.enlaces ? `<a class="pn-link" ${ext} href="${url(datos.enlaces.planilla)}">Abrir la planilla</a>` : ''}</div>
         <div class="pn-tareas">${tareas.map(([t, l]) => `
-          <details><summary><b>${l.length}</b><span>${t.charAt(0) === 'c' ? cap(t) : 'Alumnos ' + t}</span></summary><p>${nombres(l)}</p></details>`).join('')}</div>
+          <details><summary><b>${l.length}</b><span>${t.indexOf('cursos') === 0 ? cap(t) : 'Alumnos ' + t}</span></summary><p>${nombres(l)}</p></details>`).join('')}</div>
       </section>`;
   }
 

@@ -339,13 +339,24 @@ function cursosDeFila(a) {
   }));
 }
 
+// Curso y nivel se comparan sin importar mayúsculas, tildes ni espacios de más («BUSINESS ENGLISH» = «Business English»).
+function igual(a, b) { return sinTildes(a).replace(/\s+/g, ' ') === sinTildes(b).replace(/\s+/g, ' '); }
+
+// «Módulo N°»: si escribieron «1/7» (módulo 1 de 7), Sheets lo guarda como fecha (1 de julio): se toma el día.
+function numeroModulo(v) {
+  if (v instanceof Date) return Number(Utilities.formatDate(v, ZONA, 'd'));
+  if (typeof v === 'number') return v > 20000 ? Number(Utilities.formatDate(deSerie(v), ZONA, 'd')) : v;
+  const m = texto(v).match(/\d+/);
+  return m ? Number(m[0]) : 0;
+}
+
 // Programa y avance de un curso.
 function armarCurso(c) {
   const actual = c.moduloActual;
   const programa = filas('programas')
-    .filter(p => texto(p['Curso']) === c.curso && (!texto(p['Nivel']) || texto(p['Nivel']) === c.nivel))
+    .filter(p => igual(p['Curso'], c.curso) && (!texto(p['Nivel']) || igual(p['Nivel'], c.nivel)))
     .map(p => {
-      const n = Number(p['Módulo N°']) || 0;
+      const n = numeroModulo(p['Módulo N°']);
       return {
         n: n,
         nombre: texto(p['Módulo']),
@@ -360,7 +371,7 @@ function armarCurso(c) {
     })
     .sort((x, y) => x.n - y.n);
   // Avance: módulos completados sobre el total del nivel (pestaña Niveles; si no está, los módulos cargados).
-  const nivelCfg = filas('niveles').find(n => texto(n['Curso']) === c.curso && texto(n['Nivel']) === c.nivel);
+  const nivelCfg = filas('niveles').find(n => igual(n['Curso'], c.curso) && igual(n['Nivel'], c.nivel));
   const total = Math.max(Number(nivelCfg && nivelCfg['Total de módulos']) || 0, programa.length);
   const avance = { completados: actual ? Math.max(0, Math.min(actual - 1, total)) : 0, total: total };
   return Object.assign({}, c, { programa: programa, avance: avance });
@@ -764,6 +775,12 @@ function datosPanel(usuario) {
     hoy: Utilities.formatDate(new Date(), ZONA, 'dd/MM/yyyy'),
     alumnos: alumnos, cuotas: cuotas, devoluciones: devoluciones, opiniones: opiniones, avisos: avisos,
     docentes: filas('docentes').map(d => texto(d['Docente'])).filter(Boolean),
+    // Qué cursos y niveles hay en Programas (para avisar cuando un alumno tiene un nivel que no coincide).
+    programas: filas('programas').reduce((t, p) => {
+      const k = texto(p['Curso']) + ' · ' + texto(p['Nivel']);
+      if (texto(p['Curso']) && t.indexOf(k) < 0) t.push(k);
+      return t;
+    }, []),
     mensaje: c['Mensaje del inicio'] || '',
     enlaces: {
       planilla: 'https://docs.google.com/spreadsheets/d/' + PLANILLA_ID + '/edit',
