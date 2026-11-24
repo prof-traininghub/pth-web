@@ -577,13 +577,16 @@ function actualizarFormulario() {
   const lista = listas.find(i => i.getTitle() === 'Alumno');
   const listaDocentes = listas.find(i => i.getTitle() === 'Docente');
   const docentes = filas('docentes').map(d => texto(d['Docente'])).filter(Boolean);
-  if (listaDocentes && docentes.length) listaDocentes.setChoiceValues(docentes);
+  if (listaDocentes && docentes.length) listaDocentes.setChoiceValues(unicos(docentes));
   if (!lista) return;
   const alumnos = filas('alumnos')
     .filter(a => texto(a['Mail de Google']) && !/^no$/i.test(texto(a['Activo'])))
     .map(a => texto(a['Nombre']) + ' <' + texto(a['Mail de Google']).toLowerCase() + '>');
-  if (alumnos.length) lista.setChoiceValues(alumnos);
+  if (alumnos.length) lista.setChoiceValues(unicos(alumnos));
 }
+
+// Forms no acepta opciones repetidas (un alumno cargado dos veces, una fila a medio completar).
+function unicos(lista) { return lista.filter((v, i) => lista.indexOf(v) === i); }
 
 // Se corrió una vez (16/11/2026) para sacar la pregunta «Módulo» del formulario ya creado.
 function quitarPreguntaModulo() {
