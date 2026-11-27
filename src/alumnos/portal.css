@@ -200,3 +200,6 @@
 .p-tab { font: inherit; font-weight: 600; min-height: 44px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
 .p-tab[aria-selected="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .p-tab:focus-visible { outline: 3px solid var(--amarillo); outline-offset: 2px; }
+
+.p-bloqueado { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; font-size: 14.5px; }
+.p-bloqueado svg { flex: none; }

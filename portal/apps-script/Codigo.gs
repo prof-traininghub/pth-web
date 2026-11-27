@@ -139,7 +139,7 @@ function leerSesion(s) {
 function versionDatos() { return PropertiesService.getScriptProperties().getProperty('VERSION_DATOS') || '0'; }
 // La caché cambia con cada edición de la planilla y también cada día (cuotas vencidas, mes que empieza).
 // VERSION_CODIGO: subirlo cuando cambia cómo se arman los datos, así no se sirve nada armado con el código anterior.
-const VERSION_CODIGO = '3';
+const VERSION_CODIGO = '4';
 function claveVersion() { return VERSION_CODIGO + ':' + versionDatos() + ':' + Utilities.formatDate(new Date(), ZONA, 'yyyyMMdd'); }
 function comprimir(obj) { return Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(obj), 'application/json')).getBytes()); }
 function descomprimir(z) {
@@ -438,6 +438,14 @@ function armarCurso(c) {
   const nivelCfg = filas('niveles').find(n => igual(n['Curso'], c.curso) && igual(n['Nivel'], c.nivel));
   const total = Math.max(Number(nivelCfg && nivelCfg['Total de módulos']) || 0, programa.length);
   const avance = { completados: actual ? Math.max(0, Math.min(actual - 1, total)) : 0, total: total };
+  // El material de los módulos que todavía no empezó no se manda: se ve el nombre y los temas, sin links.
+  // (Sin módulo actual cargado, todo queda bloqueado hasta que lo carguen.)
+  programa.forEach(p => {
+    if (actual && p.n <= actual) return;
+    p.bloqueado = true;
+    p.bibliografia = p.bibliografia.map(b => ({ texto: b.texto, link: '' }));
+    p.tareas = ''; p.practica = ''; p.examenLink = '';
+  });
   const enCurso = programa.find(p => p.n === actual);
   // Cómo se muestra el módulo: la letra o nombre corto de Programas si lo tiene («C»); si no, el número.
   const etiqueta = !actual ? '' : enCurso && enCurso.nombre && enCurso.nombre.length <= 3 ? enCurso.nombre : String(actual);

@@ -30,6 +30,7 @@
   const wa = (num, msj) => num ? `https://wa.me/${encodeURIComponent(num)}?text=${encodeURIComponent(msj)}` : '';
 
   const ICONOS = {
+    candado: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
     meet: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/></svg>',
     ok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>',
     reloj: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
@@ -349,12 +350,14 @@
         : m.estado === 'proximo' ? '<span class="p-estado p-muted">Próximo</span>' : '';
       const biblio = m.bibliografia.length ? `<p class="p-eyebrow p-mini">Bibliografía</p><ul class="p-lista">${m.bibliografia.map(b =>
         `<li><span>${esc(b.texto)}</span>${url(b.link) ? `<a ${ext} href="${url(b.link)}">Abrir</a>` : ''}</li>`).join('')}</ul>` : '';
+      const candado = m.bloqueado ? `<p class="p-muted p-bloqueado">${ICONOS.candado}${a.moduloActual
+        ? 'El material se habilita cuando empieces este módulo.' : 'El material se habilita cuando tu profe cargue en qué módulo estás.'}</p>` : '';
       const extra = (url(m.tareas) || url(m.practica)) ? `<p class="p-eyebrow p-mini">Material extra</p><div class="p-btns">
         ${url(m.tareas) ? `<a class="btn btn-primario" ${ext} href="${url(m.tareas)}">Tareas del módulo</a>` : ''}
         ${url(m.practica) ? `<a class="btn btn-sec" ${ext} href="${url(m.practica)}">Links de práctica</a>` : ''}</div>` : '';
       return `<details class="p-modulo${m.estado === 'en curso' ? ' p-modulo-actual' : ''}"${abierto ? ' open' : ''}>
         <summary><span><b>Módulo ${esc(m.n)} · ${esc(m.nombre)}</b>${m.temas ? `<small>${esc(m.temas)}</small>` : ''}</span>${etiqueta}</summary>
-        <div class="p-modulo-cuerpo">${biblio}${extra}${!biblio && !extra ? '<p class="p-muted">Pronto vas a ver acá el material de este módulo.</p>' : ''}</div>
+        <div class="p-modulo-cuerpo">${candado}${biblio}${extra}${!biblio && !extra && !candado ? '<p class="p-muted">Pronto vas a ver acá el material de este módulo.</p>' : ''}</div>
       </details>`;
     }).join('') : '<p class="p-muted">Tu programa todavía no está cargado.</p>';
 
